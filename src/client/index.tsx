@@ -139,7 +139,6 @@ const cssVariables = [
 
 class SkinPresenter {
   private readonly scope: PreferenceStore;
-  private readonly theme: ThemeService;
   private readonly root: HTMLDivElement;
   private readonly portrait: HTMLImageElement;
   private readonly preloads: HTMLImageElement[];
@@ -153,9 +152,8 @@ class SkinPresenter {
   private disposed = false;
   private unsubscribe: () => void;
 
-  constructor(scope: PreferenceStore, theme: ThemeService) {
+  constructor(scope: PreferenceStore) {
     this.scope = scope;
-    this.theme = theme;
     this.root = document.createElement("div");
     this.root.className = "liang-skin-backdrop";
     this.root.dataset.plugin = PACKAGE_ID;
@@ -256,7 +254,11 @@ class SkinPresenter {
   private applyFrame() {
     const palette = paletteForFrame(this.frame);
     const body = document.body;
-    this.syncNativeTheme(palette.stage === 5 ? "dark" : "light");
+    // The skin is a visual overlay only: it must never rewrite the host's
+    // persisted ui-theme preference. (syncNativeTheme used to call
+    // theme.setTheme(light|dark) here, so every reload silently reset the
+    // Appearance row to light/dark.) Dark-document adaptation is handled by
+    // the skin CSS against body[data-ds-dark-theme].
     body.dataset.liangStage = String(palette.stage);
     body.style.setProperty("--liang-strength", String(palette.strength));
     body.style.setProperty("--liang-page", palette.page);
@@ -274,11 +276,6 @@ class SkinPresenter {
     body.style.setProperty("--liang-hover", palette.hover);
     body.style.setProperty("--liang-portrait-opacity", palette.portraitOpacity);
     this.updatePortrait(palette.level);
-  }
-
-  syncNativeTheme(theme: NativeThemeId = paletteForFrame(this.frame).stage === 5 ? "dark" : "light") {
-    if (!this.enabled || this.theme.getTheme().preference === theme) return;
-    this.theme.setTheme(theme);
   }
 
   private updatePortrait(level: number) {
@@ -729,28 +726,32 @@ export const inject = [
   "sessions",
   "modelDirectories",
   "locale",
-  "theme",
 ];
 
+const SKIN_ENABLED_KEY = "dsh-liang-intensity-skin.enabled";
+
 function createPreferenceStore(): PreferenceStore {
-  // The market's active skin is the source of truth for whether this client
-  // should be visible. The appearance switch is therefore scoped to this
-  // client activation and must not survive switching away and back.
+  // Remember the user's own skin on/off choice across reloads. (This used to
+  // force-enable the skin on every page load, which made it fight the host
+  // Appearance choice after each F5; the first visit defaults to on so the
+  // skin still shows for users who just installed it.)
+  let enabled: boolean;
   try {
-    localStorage.removeItem("dsh-liang-intensity-skin.enabled");
+    enabled = localStorage.getItem(SKIN_ENABLED_KEY) !== "0";
   } catch {
     // Storage may be unavailable; the in-memory default still enables Liang.
+    enabled = true;
   }
   let snapshot: SkinSettings = {
-    enabled: true,
+    enabled,
     bindEffort: localStorage.getItem(BIND_EFFORT_KEY) !== "0",
   };
   const listeners = new Set<() => void>();
   const onStorage = (event: StorageEvent) => {
-    if (event.key !== BIND_EFFORT_KEY) return;
+    if (event.key !== SKIN_ENABLED_KEY && event.key !== BIND_EFFORT_KEY) return;
     const next = {
-      enabled: snapshot.enabled,
-      bindEffort: event.newValue !== "0",
+      enabled: event.key === SKIN_ENABLED_KEY ? event.newValue !== "0" : snapshot.enabled,
+      bindEffort: event.key === BIND_EFFORT_KEY ? event.newValue !== "0" : snapshot.bindEffort,
     };
     if (next.enabled === snapshot.enabled && next.bindEffort === snapshot.bindEffort) return;
     snapshot = next;
@@ -765,6 +766,7 @@ function createPreferenceStore(): PreferenceStore {
     },
     async set(enabled) {
       if (enabled === snapshot.enabled) return;
+      localStorage.setItem(SKIN_ENABLED_KEY, enabled ? "1" : "0");
       snapshot = { ...snapshot, enabled };
       for (const listener of listeners) listener();
     },
@@ -790,8 +792,7 @@ export function apply(ctx: ClientContext) {
 
   const scope = createPreferenceStore();
   ctx.effect(() => () => scope.dispose(), "liang-intensity-skin: appearance preference");
-  const theme = ctx.get("theme") as ThemeService;
-  const presenter = new SkinPresenter(scope, theme);
+  const presenter = new SkinPresenter(scope);
   ctx.effect(() => () => presenter.dispose(), "liang-intensity-skin: backdrop presenter");
   ctx.effect(
     () => installLiangAppearanceButton(scope, presenter),

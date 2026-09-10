@@ -1,3 +1,15 @@
+## 桌面适配维护版
+
+本 fork 基于 kingOfSoySauce/dsh-liang-skin 0.1.7，保留原作者署名与项目历史。
+
+`0.1.7-desktop.1` 修复 DSH Desktop 兼容/扩展模式的半屏布局：不再覆盖宿主根容器的固定定位，背景与人物高度跟随标题栏下方的内容区域。普通 Web 布局保持原行为。
+
+验证：`npm test`、`npm run build`、`npm run test:layout`。布局测试先复现旧版本问题，再验证两种桌面模式、Web 模式、三种窗口尺寸和关闭皮肤。运行布局测试前执行 `npx playwright install chromium`，或用 `CHROME_PATH` 指定本机 Chrome。
+
+设置入口中依赖宿主生成类名的逻辑仍沿用上游。
+
+---
+
 # 滑动变祖 · DeepSeek Harness 皮肤
 
 ## 安装

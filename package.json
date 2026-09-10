@@ -49,7 +49,8 @@
   ],
   "scripts": {
     "build": "node ./scripts/build-client.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:layout": "node scripts/test-desktop-layout.mjs"
   },
   "dsh": {
     "bundle": {
@@ -70,6 +71,7 @@
     }
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/react": "~18.3.1",
     "esbuild": "^0.25.0",
     "vitest": "^4.1.10"

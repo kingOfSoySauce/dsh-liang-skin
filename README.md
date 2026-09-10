@@ -140,3 +140,9 @@ npm run build
 [Lichtspektrum/liang-intensity-calibrator](https://github.com/Lichtspektrum/liang-intensity-calibrator)。插件在原项目 0–30 强度轴的基础上，将视觉变化接入 DeepSeek Harness 的推理等级选择。
 
 运行时素材已包含在插件中，安装后不需要额外下载。当前接入 24 张经过审核的人像锚点，滑动时直接切换最近锚点，不做图片交叉渐变。
+
+### 桌面布局回归验证
+
+`npm run test:layout` 会先复现旧样式导致的半屏问题，再验证桌面兼容模式、扩展模式和普通 Web 模式在三种窗口尺寸下的布局，以及关闭皮肤后的宿主布局。
+
+运行前执行 `npx playwright install chromium`，或通过 `CHROME_PATH` 指定本机 Chrome 可执行文件。

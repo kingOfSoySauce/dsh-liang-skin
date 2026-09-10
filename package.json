@@ -1,14 +1,14 @@
 {
   "name": "dsh-client-liang-intensity-skin",
-  "version": "0.1.7-desktop.1",
+  "version": "0.1.7",
   "private": true,
   "description": "滑动变祖：an opt-in adaptive reasoning slider skin for DeepSeek Harness",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/uaapple/dsh-liang-skin.git"
+    "url": "git+https://github.com/kingOfSoySauce/dsh-liang-skin.git"
   },
-  "homepage": "https://github.com/uaapple/dsh-liang-skin#readme",
-  "bugs": "https://github.com/uaapple/dsh-liang-skin/issues",
+  "homepage": "https://github.com/kingOfSoySauce/dsh-liang-skin#readme",
+  "bugs": "https://github.com/kingOfSoySauce/dsh-liang-skin/issues",
   "type": "module",
   "main": "./src/index.js",
   "exports": {

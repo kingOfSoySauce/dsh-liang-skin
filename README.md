@@ -1,15 +1,3 @@
-## 桌面适配维护版
-
-本 fork 基于 kingOfSoySauce/dsh-liang-skin 0.1.7，保留原作者署名与项目历史。
-
-`0.1.7-desktop.1` 修复 DSH Desktop 兼容/扩展模式的半屏布局：不再覆盖宿主根容器的固定定位，背景与人物高度跟随标题栏下方的内容区域。普通 Web 布局保持原行为。
-
-验证：`npm test`、`npm run build`、`npm run test:layout`。布局测试先复现旧版本问题，再验证两种桌面模式、Web 模式、三种窗口尺寸和关闭皮肤。运行布局测试前执行 `npx playwright install chromium`，或用 `CHROME_PATH` 指定本机 Chrome。
-
-设置入口中依赖宿主生成类名的逻辑仍沿用上游。
-
----
-
 # 滑动变祖 · DeepSeek Harness 皮肤
 
 ## 安装
@@ -152,3 +140,9 @@ npm run build
 [Lichtspektrum/liang-intensity-calibrator](https://github.com/Lichtspektrum/liang-intensity-calibrator)。插件在原项目 0–30 强度轴的基础上，将视觉变化接入 DeepSeek Harness 的推理等级选择。
 
 运行时素材已包含在插件中，安装后不需要额外下载。当前接入 24 张经过审核的人像锚点，滑动时直接切换最近锚点，不做图片交叉渐变。
+
+### 桌面布局回归验证
+
+`npm run test:layout` 会先复现旧样式导致的半屏问题，再验证桌面兼容模式、扩展模式和普通 Web 模式在三种窗口尺寸下的布局，以及关闭皮肤后的宿主布局。
+
+运行前执行 `npx playwright install chromium`，或通过 `CHROME_PATH` 指定本机 Chrome 可执行文件。

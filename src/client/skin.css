@@ -1,6 +1,8 @@
+/* Sit above the canvas but behind every application surface, so the skin never
+   has to reposition the host's own root container (desktop shells own #root). */
 .liang-skin-backdrop {
   position: fixed;
-  z-index: 0;
+  z-index: -1;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
@@ -42,15 +44,24 @@ body[data-liang-skin="on"] .liang-skin-backdrop {
   display: none;
 }
 
+/* The scrim that keeps the portrait readable is painted exactly once, here.
+   Painting it through `--dsw-alias-bg-base` used to stack it on both the app
+   frame and the nested conversation column, which multiplied the veil
+   (0.28² → 48% light, 0.42² → 66% dark) and washed the portrait out. */
 .liang-skin-backdrop::after {
   position: absolute;
   inset: 0;
   content: "";
-  background: linear-gradient(90deg, var(--liang-page, transparent) 0 28%, transparent 57% 100%);
+  background:
+    linear-gradient(90deg, var(--liang-page, transparent) 0 28%, transparent 57% 100%),
+    linear-gradient(var(--liang-bg-base, transparent), var(--liang-bg-base, transparent));
 }
 
 body[data-liang-skin="on"] {
-  --dsw-alias-bg-base: var(--liang-bg-base) !important;
+  /* The host paints this token on both the window frame and the nested
+     conversation column. Keeping it transparent leaves the single scrim in
+     `.liang-skin-backdrop::after` as the only veil over the portrait. */
+  --dsw-alias-bg-base: transparent !important;
   --dsw-alias-bg-layer-1: var(--liang-layer-1) !important;
   --dsw-alias-bg-layer-2: var(--liang-layer-2) !important;
   --dsw-alias-bg-layer-3: var(--liang-layer-3) !important;
@@ -87,6 +98,18 @@ body[data-liang-skin="on"] {
   --dsw-alias-markdown-inline-code: var(--liang-layer-2) !important;
   --dsw-alias-markdown-placeholder: var(--liang-layer-1) !important;
   --dsw-alias-markdown-tag: var(--liang-layer-2) !important;
+  /* Tokens the skin used to leave at the host palette: overlays and scrollbars
+     kept their native colors and covered the portrait with an opaque sheet.
+     `--dsw-alias-bg-module-platform` is deliberately left alone: the host paints
+     the selected theme cube with it, and the skin's layer colors would erase
+     that selection affordance. */
+  --dsw-alias-bg-overlay: var(--liang-layer-2) !important;
+  --dsw-alias-bg-mask-1: color-mix(in srgb, var(--liang-page) 55%, transparent) !important;
+  --dsw-specific-tip: var(--liang-layer-2) !important;
+  --dsw-alias-scrollbar-bg-l1: color-mix(in srgb, var(--liang-secondary) 34%, transparent) !important;
+  --dsw-alias-scrollbar-bg-l2: color-mix(in srgb, var(--liang-secondary) 34%, transparent) !important;
+  --dsw-alias-scrollbar-hover-l1: color-mix(in srgb, var(--liang-secondary) 58%, transparent) !important;
+  --dsw-alias-scrollbar-hover-l2: color-mix(in srgb, var(--liang-secondary) 58%, transparent) !important;
   background: var(--liang-page) !important;
 }
 
@@ -180,7 +203,9 @@ body[data-liang-skin="on"][data-ds-dark-theme]:is(
   [data-liang-stage="2"],
   [data-liang-stage="3"]
 ) .liang-skin-backdrop::after {
-  background: linear-gradient(90deg, var(--liang-page) 0 28%, transparent 57% 100%);
+  background:
+    linear-gradient(90deg, var(--liang-page) 0 28%, transparent 57% 100%),
+    linear-gradient(var(--liang-bg-base, transparent), var(--liang-bg-base, transparent));
 }
 
 /* The host renders the running-turn label as a clipped blue text gradient.
@@ -265,9 +290,26 @@ body[data-liang-skin="on"]:is(
   opacity: 1;
 }
 
+/* Only the backdrop's own stacking is the skin's business: the host owns #root
+   positioning (the desktop shell pins it below its native title bar, and
+   overriding it collapsed the shell layout). */
 body[data-liang-skin="on"] > #root {
-  position: relative;
-  z-index: 1;
+  background: transparent !important;
+}
+
+/* Windows shells reserve the caption height above every column and paint the
+   whole app frame with the sidebar fill ([data-windows-titlebar] .*_frame), so
+   the frame itself sat as a 96% opaque sheet over the portrait on Windows only.
+   Keep that fill for the caption row (the frame's own ::before, which stays the
+   drag region) and let the frame body show the backdrop, exactly as the macOS
+   and Web layouts already do. Two host facts identify that one element: it is
+   the frame that owns the sidebar column, and Windows also gives it an inline
+   --dsh-windows-sidebar-width. Matching only those avoids clearing the surface
+   of the other *_frame components. */
+html[data-windows-titlebar] body[data-liang-skin="on"] [class$="_frame"]:is(
+  :has(> [class$="_sidebarCol"]),
+  [style*="--dsh-windows-sidebar-width"]
+) {
   background: transparent !important;
 }
 
@@ -475,7 +517,9 @@ body[data-liang-skin="on"] .liang-effort-control__range::-webkit-slider-thumb {
   display: flex;
 }
 
-[class*="_8HJdBW_cubeRow"]:has(.liang-appearance-choice) {
+/* Match the host's theme-cube row by class suffix: its CSS-module hash changes
+   between builds, so the old `_8HJdBW_cubeRow` literal stops matching. */
+[class*="_cubeRow"]:has(.liang-appearance-choice) {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }

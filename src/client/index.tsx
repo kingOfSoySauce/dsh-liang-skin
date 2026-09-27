@@ -589,8 +589,13 @@ function AppearanceSkinRow({ scope, presenter, theme, subscribeTheme, t }: Setti
   );
 }
 
-const NATIVE_APPEARANCE_GROUP = '[class*="_8HJdBW_group"]';
-const NATIVE_APPEARANCE_ROW = '[class*="_8HJdBW_cubeRow"]';
+/* The appearance row's CSS-module hash changes between Harness builds (the row
+   was `_8HJdBW_cubeRow` when this plugin shipped and is `acoaHG_cubeRow` on the
+   0.1.7 host), so key off the stable class suffix plus the cubes the row
+   actually contains, and derive the surrounding group from that row. */
+const NATIVE_APPEARANCE_ROW = '[class*="_cubeRow"]';
+const NATIVE_APPEARANCE_CUBE = '[class*="_themeCube"]';
+const NATIVE_APPEARANCE_GROUP = '[class*="_group"]';
 const LIANG_APPEARANCE_BUTTON = "liang-appearance-choice";
 const LIANG_BINDING_CONTROL = "liang-appearance-binding";
 const LIANG_BINDING_INPUT = "liang-appearance-binding__input";
@@ -601,10 +606,11 @@ function installLiangAppearanceButton(scope: PreferenceStore, presenter: SkinPre
   const nativeClickHandlers = new Map<HTMLButtonElement, () => void>();
 
   const sync = () => {
-    const group = [...document.querySelectorAll<HTMLElement>(NATIVE_APPEARANCE_GROUP)]
-      .find((node) => node.querySelector('[class*="_8HJdBW_themeCube"]'));
-    const row = group?.querySelector<HTMLElement>(NATIVE_APPEARANCE_ROW);
-    if (row === undefined || row === null) return;
+    const row = [...document.querySelectorAll<HTMLElement>(NATIVE_APPEARANCE_ROW)]
+      .find((node) => node.querySelector(NATIVE_APPEARANCE_CUBE) !== null);
+    if (row === undefined) return;
+    const group = row.closest<HTMLElement>(NATIVE_APPEARANCE_GROUP) ?? row.parentElement;
+    if (group === null) return;
 
     let customButton = row.querySelector<HTMLButtonElement>(`.${LIANG_APPEARANCE_BUTTON}`);
     if (customButton === null) {
@@ -691,7 +697,7 @@ function installLiangAppearanceButton(scope: PreferenceStore, presenter: SkinPre
       }
     }
 
-    for (const nativeButton of row.querySelectorAll<HTMLButtonElement>('[class*="_8HJdBW_themeCube"]')) {
+    for (const nativeButton of row.querySelectorAll<HTMLButtonElement>(NATIVE_APPEARANCE_CUBE)) {
       if (hookedNativeButtons.has(nativeButton)) continue;
       hookedNativeButtons.add(nativeButton);
       const handleNativeClick = () => {

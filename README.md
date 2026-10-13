@@ -61,6 +61,8 @@ dsh plugin --profile web add 'github:kingOfSoySauce/dsh-liang-skin'
 - `滑动变祖`：显示滑块并启用人物、背景和自适应配色。
 - `原生`：移除背景层、皮肤变量和滑块，恢复 Harness 原生界面。
 
+皮肤保持启用时，人物与背景配色由滑块档位决定；切换 DSH 原生深浅主题不会改变当前档位的背景。
+
 选择保存在当前浏览器本地，不会改动模型配置。
 
 <a id="cli-install"></a>

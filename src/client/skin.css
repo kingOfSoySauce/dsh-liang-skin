@@ -127,62 +127,6 @@ body[data-liang-skin="on"][data-liang-stage="5"] {
   --dsw-specific-sidebar-nav-item-hover: var(--liang-hover) !important;
 }
 
-/* The low-intensity skin is light by default, but it must not turn a dark
-   Harness document into a light surface. Keep the skin's portrait progression
-   while switching the shared UI layers back to a readable charcoal palette. */
-body[data-liang-skin="on"][data-ds-dark-theme]:is(
-  [data-liang-stage="0"],
-  [data-liang-stage="1"],
-  [data-liang-stage="2"],
-  [data-liang-stage="3"]
-) {
-  --liang-page: rgb(17 17 17) !important;
-  --liang-bg-base: rgb(17 17 17 / 42%) !important;
-  --liang-layer-1: rgb(30 27 25 / 94%) !important;
-  --liang-layer-2: rgb(41 35 30 / 96%) !important;
-  --liang-layer-3: rgb(41 35 30 / 99%) !important;
-  --liang-sidebar: rgb(23 20 18 / 96%) !important;
-  --liang-ink: rgb(244 241 232) !important;
-  --liang-secondary: rgb(184 180 169) !important;
-  --liang-tertiary: rgb(137 134 126) !important;
-  --liang-border: rgb(244 241 232 / 15%) !important;
-  --liang-hover: rgb(244 241 232 / 9%) !important;
-  --dsw-alias-brand-primary: var(--liang-accent) !important;
-  --dsw-alias-brand-text: var(--liang-accent) !important;
-  --dsw-alias-button-primary-fill: var(--liang-accent) !important;
-  --dsw-alias-button-primary-hover: var(--liang-accent-hover) !important;
-  --dsw-alias-button-info-fill: var(--liang-accent) !important;
-  --dsw-alias-button-info-hover: var(--liang-accent-hover) !important;
-  --dsw-alias-state-business-primary: var(--liang-accent) !important;
-  --dsw-alias-button-elevated-fill: var(--liang-layer-1) !important;
-  --dsw-alias-button-floating-fill: var(--liang-layer-2) !important;
-  --dsw-alias-button-floating-hover: var(--liang-layer-3) !important;
-  --dsw-alias-interactive-bg-hover-solid: var(--liang-layer-2) !important;
-  --dsw-specific-bubble: var(--liang-layer-2) !important;
-  --dsw-specific-input-major: var(--liang-layer-1) !important;
-  --dsw-specific-menu: var(--liang-layer-3) !important;
-  --dsw-specific-selector: var(--liang-layer-2) !important;
-  background: var(--liang-page) !important;
-}
-
-body[data-liang-skin="on"][data-ds-dark-theme]:is(
-  [data-liang-stage="0"],
-  [data-liang-stage="1"],
-  [data-liang-stage="2"],
-  [data-liang-stage="3"]
-) .liang-skin-backdrop {
-  background: var(--liang-page) !important;
-}
-
-body[data-liang-skin="on"][data-ds-dark-theme]:is(
-  [data-liang-stage="0"],
-  [data-liang-stage="1"],
-  [data-liang-stage="2"],
-  [data-liang-stage="3"]
-) .liang-skin-backdrop::after {
-  background: linear-gradient(90deg, var(--liang-page) 0 28%, transparent 57% 100%);
-}
-
 /* The host renders the running-turn label as a clipped blue text gradient.
    Retarget only that gradient's color tokens in the custom dark skin; keep
    the host's text clipping and shimmer behavior, and leave light mode alone. */
@@ -276,6 +220,31 @@ body[data-liang-skin="on"] > #root {
    conversation surfaces painted by their own host rules. */
 html[data-windows-titlebar] body[data-liang-skin="on"] #root [class*="_frame"]:has(> [class*="_centerCol"]) {
   background: transparent !important;
+}
+
+/* macOS adds different translucent sidebar materials for native light/dark.
+   While Liang is active, the effort palette owns the sidebar fill. */
+html[data-platform="darwin"] body[data-liang-skin="on"] #root [class*="_frame"]:has(> [class*="_centerCol"]) > [class*="_sidebarCol"] {
+  background: var(--liang-sidebar) !important;
+}
+
+/* Keep the host's expanded new-session surface on the same palette. The
+   collapsed icon keeps its native transparent surface and hover behavior. */
+html[data-platform="darwin"] body[data-liang-skin="on"] #root [class*="_sidebarCol"] [class*="_root"]:has(> [class*="_logoRow"]):not([class*="_collapsed"]) button[class*="_newSession"] {
+  background: var(--dsw-alias-button-elevated-fill) !important;
+}
+
+html[data-platform="darwin"] body[data-liang-skin="on"] #root [class*="_sidebarCol"] [class*="_root"]:has(> [class*="_logoRow"]):not([class*="_collapsed"]) button[class*="_newSession"]:hover {
+  background: var(--dsw-alias-button-floating-hover) !important;
+}
+
+/* The native dark rule also outranks the collapsed icon's transparent fill. */
+html[data-platform="darwin"] body[data-liang-skin="on"] #root [class*="_sidebarCol"] [class*="_root"][class*="_collapsed"]:has(> [class*="_logoRow"]) button[class*="_newSession"] {
+  background: transparent !important;
+}
+
+html[data-platform="darwin"] body[data-liang-skin="on"] #root [class*="_sidebarCol"] [class*="_root"][class*="_collapsed"]:has(> [class*="_logoRow"]) button[class*="_newSession"]:hover {
+  background: var(--dsw-alias-interactive-bg-hover) !important;
 }
 
 body[data-liang-skin="on"] button,

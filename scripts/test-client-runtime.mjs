@@ -87,6 +87,8 @@ async function fixture({ fail = () => false, holdRetry = null } = {}) {
       cleanups: [], decoded: new WeakSet(), decodedImages: [],
       registered: null, scope: null, presenter: null, module: null,
       activeLocales: 0, activeSlots: 0, errors: [],
+      registrations: new Map(), dictionaries: new Map(), binding: null,
+      bindingHooks: [], bindingHookIndex: 0, renderingBinding: false,
     };
     window.__runtime = runtime;
     window.addEventListener('unhandledrejection', (event) => runtime.errors.push(String(event.reason)));
@@ -100,17 +102,34 @@ async function fixture({ fail = () => false, holdRetry = null } = {}) {
         return value;
       });
     };
-    const unexpectedRender = () => { throw new Error('The runtime fixture must not render React components'); };
+    const unexpectedRender = () => { throw new Error('The runtime fixture must not render a host React component'); };
+    // This identity stands for the host's imported component. Never implement
+    // its DOM or styles here: native Switch visuals are verified in real DSH.
+    runtime.nativeSwitch = unexpectedRender;
+    const jsx = (type, props, key) => ({ type, props, key });
+    const useState = (initial) => {
+      if (!runtime.renderingBinding) return unexpectedRender();
+      const index = runtime.bindingHookIndex++;
+      if (!(index in runtime.bindingHooks)) runtime.bindingHooks[index] = initial;
+      return [runtime.bindingHooks[index], (next) => {
+        runtime.bindingHooks[index] = typeof next === 'function' ? next(runtime.bindingHooks[index]) : next;
+      }];
+    };
+    const useSyncExternalStore = (_subscribe, getSnapshot) => {
+      if (!runtime.renderingBinding) return unexpectedRender();
+      return getSnapshot();
+    };
     window.__ModuleLoader__ = {
       load({ id, factory }) {
         runtime.moduleId = id;
         runtime.module = factory((name) => {
           if (name === 'react') return {
             useEffect: unexpectedRender, useMemo: unexpectedRender,
-            useRef: unexpectedRender, useState: unexpectedRender,
-            useSyncExternalStore: unexpectedRender,
+            useRef: unexpectedRender, useState,
+            useSyncExternalStore,
           };
-          if (name === 'react/jsx-runtime') return { jsx: unexpectedRender, jsxs: unexpectedRender };
+          if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx };
+          if (name === '@deepseek-ai/dsh-client-ui-primitives') return { Switch: runtime.nativeSwitch };
           throw new Error(`Unexpected client import: ${name}`);
         });
       },
@@ -137,9 +156,13 @@ async function fixture({ fail = () => false, holdRetry = null } = {}) {
         throw new Error(`Unexpected host service: ${name}`);
       },
       locale: {
-        register() {
+        register(namespace, dictionaries) {
           runtime.activeLocales += 1;
-          return () => { runtime.activeLocales -= 1; };
+          runtime.dictionaries.set(namespace, dictionaries);
+          return () => {
+            runtime.activeLocales -= 1;
+            runtime.dictionaries.delete(namespace);
+          };
         },
       },
       slots: {
@@ -147,12 +170,24 @@ async function fixture({ fail = () => false, holdRetry = null } = {}) {
           const cleanup = callback();
           if (typeof cleanup === 'function') runtime.cleanups.push(cleanup);
         },
-        register(definition) {
+        register(definition, component) {
           runtime.activeSlots += 1;
-          runtime.registered = definition.inject('fixture-session');
-          runtime.scope = runtime.registered.scope;
-          runtime.presenter = runtime.registered.presenter;
-          return () => { runtime.activeSlots -= 1; };
+          const props = definition.inject?.('fixture-session') ?? {};
+          const registration = { definition, component, props };
+          runtime.registrations.set(definition.id, registration);
+          if (definition.id === 'liang-intensity-control') {
+            runtime.registered = props;
+            runtime.scope = props.scope;
+            runtime.presenter = props.presenter;
+          } else if (definition.id === 'liang-effort-binding') {
+            runtime.binding = registration;
+          } else {
+            throw new Error(`Unexpected client slot: ${definition.id}`);
+          }
+          return () => {
+            runtime.activeSlots -= 1;
+            runtime.registrations.delete(definition.id);
+          };
         },
       },
       sessions: { subagentAddress: () => undefined },
@@ -166,6 +201,17 @@ async function fixture({ fail = () => false, holdRetry = null } = {}) {
     };
     if (typeof runtime.module?.apply !== 'function') throw new Error('Built client did not export apply(ctx)');
     runtime.module.apply(ctx);
+    runtime.renderBinding = (language = 'zh') => {
+      if (runtime.binding === null) throw new Error('The native binding row was not registered');
+      const { definition, component, props } = runtime.binding;
+      runtime.bindingHookIndex = 0;
+      runtime.renderingBinding = true;
+      try {
+        return component({ ...props, t: (key) => runtime.dictionaries.get(definition.locale)?.[language]?.[key] ?? key });
+      } finally {
+        runtime.renderingBinding = false;
+      }
+    };
     runtime.dispose = () => {
       for (const cleanup of runtime.cleanups.splice(0).reverse()) cleanup();
     };
@@ -205,7 +251,7 @@ async function waitForPortrait(page, filename, retry = null) {
 }
 
 async function assertRemoved(page, fullyDisposed = false) {
-  const result = await page.evaluate(() => ({
+  const result = await page.evaluate((fullyDisposed) => ({
     backdrop: document.querySelectorAll('.liang-skin-backdrop').length,
     skin: document.body.hasAttribute('data-liang-skin'),
     stage: document.body.hasAttribute('data-liang-stage'),
@@ -215,18 +261,93 @@ async function assertRemoved(page, fullyDisposed = false) {
     controls: document.querySelectorAll('.liang-appearance-choice, .liang-appearance-binding').length,
     locales: window.__runtime.activeLocales,
     slots: window.__runtime.activeSlots,
-  }));
+    bindingVisible: !fullyDisposed && window.__runtime.renderBinding() !== null,
+  }), fullyDisposed);
   assert.equal(result.backdrop, 0, 'No portrait backdrop remains');
   assert.equal(result.skin, false, 'Skin marker is removed');
   assert.equal(result.stage, false, 'Stage marker is removed');
   assert.deepEqual(result.variables, [], 'All presenter CSS variables are removed');
   assert.equal(result.retainedSources, 0, 'Decoded images release their network sources');
+  assert.equal(result.bindingVisible, false, 'The binding slot returns null while the skin is off');
   if (fullyDisposed) {
     assert.equal(result.styles, 0, 'Client stylesheet is removed');
     assert.equal(result.controls, 0, 'Appearance controls are removed');
     assert.equal(result.locales, 0, 'Locale registration is released');
     assert.equal(result.slots, 0, 'Slot registration is released');
   }
+}
+
+async function assertNativeBinding(page) {
+  const result = await page.evaluate(async () => {
+    const runtime = window.__runtime;
+    const check = (condition, message) => { if (!condition) throw new Error(message); };
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+    const binding = runtime.binding;
+    check(binding?.definition.name === 'settings.general.item'
+      && binding.definition.id === 'liang-effort-binding'
+      && binding.definition.order === 10.5, 'Binding uses the native General Settings slot after appearance');
+    check(binding.props.scope === runtime.scope, 'Binding and portrait share the real preference store');
+    const controls = (language = 'zh') => {
+      const tree = runtime.renderBinding(language);
+      const nodes = [];
+      const visit = (node) => {
+        if (Array.isArray(node)) return node.forEach(visit);
+        if (node === null || typeof node !== 'object') return;
+        nodes.push(node);
+        visit(node.props?.children);
+      };
+      visit(tree);
+      const switches = nodes.filter((node) => node.type === runtime.nativeSwitch);
+      check(switches.length === 1, 'Binding must reference the imported host Switch exactly once');
+      check(tree.type === 'div', 'The binding row is a non-interactive div');
+      check(nodes.every((node) => !['input', 'button', 'label'].includes(node.type)
+        && node.props?.onClick === undefined && node.props?.htmlFor === undefined),
+      'No hand-drawn switch or whole-row/text click handler');
+      check(switches[0].props.className === undefined && switches[0].props.style === undefined,
+        'Native Switch receives no skin shape or color overrides');
+      const text = nodes.find((node) => node.type === 'span');
+      check(text?.props.children === switches[0].props.label, 'Visible text is the native Switch accessible name');
+      return { text, control: switches[0] };
+    };
+    let { text, control } = controls();
+    check(text.props.children === '滑动变祖绑定思考等级', 'Original Chinese binding label is preserved');
+    check(controls('en').text.props.children === 'Bind slider to reasoning level', 'English binding label comes from locale');
+    check(control.props.checked === true && control.props.disabled === false, 'Binding starts with persisted state');
+    text.props.onClick?.();
+    check(runtime.scope.getSnapshot().bindEffort === true, 'Text has no binding write callback');
+    control.props.onChange(false);
+    check(controls().control.props.disabled === true, 'Native Switch is disabled while saving');
+    await flush();
+    control = controls().control;
+    check(runtime.scope.getSnapshot().bindEffort === false && control.props.checked === false
+      && control.props.disabled === false, 'Only Switch onChange writes the binding preference');
+    const setBindEffort = runtime.scope.setBindEffort;
+    let rejectWrite, writes = 0;
+    runtime.scope.setBindEffort = () => {
+      writes += 1;
+      return new Promise((_, reject) => { rejectWrite = reject; });
+    };
+    try {
+      control.props.onChange(true);
+      control = controls().control;
+      check(control.props.disabled === true, 'Pending write keeps the native control disabled');
+      control.props.onChange(true);
+      check(writes === 1, 'Pending change cannot enqueue a second write');
+      rejectWrite(new Error('fixture: binding write rejected'));
+      await flush();
+      control = controls().control;
+      check(control.props.checked === false && control.props.disabled === false,
+        'Failed write preserves accepted state and unlocks the native control');
+    } finally {
+      runtime.scope.setBindEffort = setBindEffort;
+    }
+    control.props.onChange(true);
+    await flush();
+    check(runtime.scope.getSnapshot().bindEffort === true, 'Binding remains usable after a failed write');
+    return { passed: true, slots: runtime.activeSlots };
+  });
+  assert.equal(result.passed, true);
+  assert.equal(result.slots, 2, 'Runtime registers both conversation and native binding slots');
 }
 
 async function assertNoErrors(test) {
@@ -241,6 +362,7 @@ try {
     await waitForPortrait(success.page, 'stage-30.webp');
     assert.equal(success.requests.length, 24, 'Decoded display nodes do not start duplicate requests');
     assert.equal(new Set(success.requests.map(({ name }) => name)).size, 24, 'Every shipped anchor is requested');
+    await assertNativeBinding(success.page);
     await success.page.evaluate(() => window.__runtime.presenter.setFrame(48));
     await waitForPortrait(success.page, 'stage-06.webp');
     await success.page.evaluate(() => window.__runtime.presenter.choose(false));
@@ -301,7 +423,7 @@ try {
   } finally {
     await recovery.close();
   }
-  console.log('PASS: built apply(ctx), 24 native WebP decodes, frame swaps, partial failure, first-frame retry, disable/enable, and disposal with late responses.');
+  console.log('PASS: built apply(ctx), 24 native WebP decodes, frame swaps, partial failure, first-frame retry, native Switch binding contract, disable/enable, and disposal with late responses.');
 } finally {
   await browser.close();
 }

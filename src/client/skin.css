@@ -497,90 +497,14 @@ body[data-liang-skin="on"] .liang-effort-control__range::-webkit-slider-thumb {
 }
 
 .liang-appearance-binding {
-  box-sizing: border-box;
   display: flex;
-  width: 100%;
-  min-height: 28px;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 4px 0 0;
-  color: var(--dsw-alias-label-primary);
-  font: inherit;
+  gap: 24px;
+  padding: 16px 0;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l2);
   font-size: 14px;
-  line-height: 22px;
-  cursor: pointer;
-}
-
-.liang-appearance-binding__label {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.liang-appearance-binding__copy {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.liang-appearance-binding__description {
-  display: block;
-  overflow: hidden;
-  color: var(--dsw-alias-label-secondary);
-  font-size: 12px;
-  line-height: 18px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.liang-appearance-binding__input {
-  position: relative;
-  flex: 0 0 36px;
-  width: 36px;
-  height: 20px;
-  margin: 0;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 999px;
-  outline: none;
-  cursor: pointer;
-  appearance: none;
-  background: var(--dsw-alias-interactive-bg-hover, var(--dsw-alias-bg-module-platform));
-}
-
-.liang-appearance-binding__input::before {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  content: "";
-  background: var(--dsw-alias-label-primary);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 18%);
-  transition: transform 160ms ease, background-color 160ms ease;
-}
-
-.liang-appearance-binding__input:checked {
-  border-color: var(--dsw-static-neutral-bluish-400);
-  background: var(--dsw-static-neutral-bluish-400);
-}
-
-.liang-appearance-binding__input:checked::before {
-  background: var(--dsw-alias-bg-layer-1, #fff);
-  transform: translateX(16px);
-}
-
-.liang-appearance-binding__input:focus-visible {
-  box-shadow: 0 0 0 2px var(--dsw-alias-interactive-bg-hover);
-}
-
-.liang-appearance-binding__input:disabled {
-  cursor: progress;
-  opacity: 0.7;
+  line-height: 20px;
 }
 
 @media (max-width: 760px) {

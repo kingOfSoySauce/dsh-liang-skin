@@ -67,10 +67,10 @@ async function prepare(context, options = {}) {
   await page.setContent(fixture(options));
   await page.addScriptTag({ content: compiled.outputFiles[0].text });
   await page.evaluate(({ packageId, enabled }) => {
-    let snapshot = { enabled, bindEffort: true };
+    let snapshot = { enabled };
     const listeners = new Set();
     const calls = [];
-    let releaseChoice, holdNextChoice = false, failNextChoice = false, failNextBinding = false;
+    let releaseChoice, holdNextChoice = false, failNextChoice = false;
     let dispose = () => {};
     const publish = patch => {
       snapshot = { ...snapshot, ...patch };
@@ -81,11 +81,6 @@ async function prepare(context, options = {}) {
     const scope = {
       getSnapshot: () => snapshot,
       subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
-      async setBindEffort(value) {
-        calls.push(["binding", value]);
-        if (failNextBinding) { failNextBinding = false; throw new Error("fixture write rejected"); }
-        publish({ bindEffort: value });
-      },
     };
     const presenter = {
       async choose(value) {
@@ -120,7 +115,7 @@ async function prepare(context, options = {}) {
       },
       dispose() { dispose(); }, setEnabled(value) { publish({ enabled: value }); },
       holdChoice() { holdNextChoice = true; }, releaseChoice() { releaseChoice?.(); },
-      rejectChoice() { failNextChoice = true; }, rejectBinding() { failNextBinding = true; },
+      rejectChoice() { failNextChoice = true; },
     };
     document.querySelector("#portal").addEventListener("click", () => window.fixture.portalClicks++);
     publish({});
@@ -183,45 +178,38 @@ async function assertLayout(page, options, enabled = true) {
 
 async function appearanceChecks(page, hash) {
   await page.evaluate(hash => window.fixture.install(hash), hash);
-  const custom = page.locator("#native-row > .liang-appearance-choice"), binding = page.locator(".liang-appearance-binding__input");
+  const custom = page.locator("#native-row > .liang-appearance-choice");
   await custom.waitFor();
   assert.equal(await page.locator(".liang-appearance-choice").count(), 1);
   assert.equal(await page.locator("#unrelated .liang-appearance-choice, #nested-unrelated .liang-appearance-choice").count(), 0);
   assert.equal(await custom.getAttribute("data-plugin"), packageId);
   assert.equal(await custom.getAttribute("aria-pressed"), "true");
-  await binding.uncheck();
-  await page.waitForFunction(() => !window.fixture.snapshot().bindEffort);
-  assert.equal(await binding.getAttribute("aria-checked"), "false");
-  await binding.check(); await page.waitForFunction(() => window.fixture.snapshot().bindEffort);
+  assert.equal(await page.locator(".liang-appearance-binding, input[role=switch]").count(), 0,
+    "The imperative appearance extension must not draw its own binding switch");
   for (const theme of ["light", "dark", "system"]) {
     await page.locator(`[data-theme="${theme}"]`).click();
     await page.waitForFunction(() => !window.fixture.snapshot().enabled);
     assert.equal(await page.locator(".liang-appearance-binding").count(), 0);
     assert.equal(await custom.getAttribute("aria-pressed"), "false");
     assert.equal(await page.evaluate(() => window.fixture.nativeTheme), theme);
-    await custom.click(); await page.waitForFunction(() => window.fixture.snapshot().enabled); await binding.waitFor();
+    await custom.click(); await page.waitForFunction(() => window.fixture.snapshot().enabled);
   }
   assert.equal(await page.evaluate(() => window.fixture.nativeClicks), 3, "Native theme handlers still run");
   await page.evaluate(() => {
     window.oldNative = document.querySelector('[data-theme="light"]');
     window.oldCustom = document.querySelector(".liang-appearance-choice");
-    window.oldBinding = document.querySelector(".liang-appearance-binding__input"); window.fixture.rebuild();
+    window.fixture.rebuild();
   });
   await page.locator("#native-row._newHash42_cubeRow > .liang-appearance-choice").waitFor();
   assert.equal(await page.locator(".liang-appearance-choice").count(), 1, "DOM reconstruction produces one control");
   const beforeStaleClicks = await page.evaluate(() => window.fixture.calls.length);
-  await page.evaluate(() => { window.oldNative.click(); window.oldCustom.click(); window.oldBinding.dispatchEvent(new Event("change", { bubbles: true })); });
+  await page.evaluate(() => { window.oldNative.click(); window.oldCustom.click(); });
   assert.equal(await page.evaluate(() => window.fixture.calls.length), beforeStaleClicks, "Replaced nodes lose plugin listeners");
   await page.locator('[data-theme="dark"]').click(); await page.waitForFunction(() => !window.fixture.snapshot().enabled);
   await custom.click(); await page.waitForFunction(() => window.fixture.snapshot().enabled);
   await page.evaluate(() => window.fixture.removeRow());
   await page.waitForFunction(() => document.querySelector(".liang-appearance-choice") === null);
   await page.evaluate(() => window.fixture.restoreRow()); await custom.waitFor();
-  await page.evaluate(() => {
-    window.fixture.rejectBinding(); const input = document.querySelector(".liang-appearance-binding__input");
-    input.checked = false; input.dispatchEvent(new Event("change", { bubbles: true }));
-  });
-  await page.waitForFunction(() => document.querySelector(".liang-appearance-binding__input").checked);
   await page.evaluate(() => window.fixture.rejectChoice()); await page.locator('[data-theme="light"]').click();
   await page.waitForFunction(() => !document.querySelector(".liang-appearance-choice").disabled);
   assert.equal(await custom.getAttribute("aria-pressed"), "true", "Rejected preference preserves skin state");
@@ -266,7 +254,7 @@ try {
   for (const hash of ["_8HJdBW", "_currentHash89"]) {
     const { page, errors } = await prepare(context); await appearanceChecks(page, hash);
     assert.deepEqual(errors, [], `${hash}: browser errors`); await page.close();
-    console.log(`PASS appearance ${hash}: multi-class discovery, choices, binding, DOM rebuild, disposal race`);
+    console.log(`PASS appearance ${hash}: multi-class discovery, choices, DOM rebuild, disposal race`);
   }
   const first = await prepare(context), second = await prepare(context, { desktop: true, windows: true, top: 40 });
   await first.page.evaluate(() => window.fixture.install()); await second.page.evaluate(() => window.fixture.install("_otherWindow"));

@@ -56,11 +56,11 @@ dsh plugin --profile web add 'github:kingOfSoySauce/dsh-liang-skin'
 
 ## 外观开关
 
-入口位于 `设置 → 通用设置 → 外观皮肤`：
+入口位于 `设置 → 通用设置 → 外观`：
 
 - `滑动变祖`：显示滑块并启用人物、背景和自适应配色。
-- `原生`：移除背景层、皮肤变量和滑块，恢复 Harness 原生界面。
-- `滑动变祖绑定思考等级`：关闭后滑块只切换人物和配色，不修改模型的推理等级。
+- 点击原生的 `浅色`、`深色` 或 `跟随系统`：移除背景层、皮肤变量和滑块，切回对应的 Harness 原生外观。
+- `滑动变祖绑定思考等级`：使用 DSH 原生开关，关闭后滑块只切换人物和配色，不修改模型的推理等级；仅点击开关切换，标题文字不触发切换。
 
 皮肤保持启用时，人物与背景配色由滑块档位决定；切换 DSH 原生深浅主题不会改变当前档位的背景。
 
@@ -70,7 +70,7 @@ dsh plugin --profile web add 'github:kingOfSoySauce/dsh-liang-skin'
 
 ## 命令安装
 
-需要先安装 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)；当前版本已在 `0.1.0-rc.6` 上验证。安装本身可以在 DSH 运行时执行（只改动磁盘配置），重启后生效。三种方式任选其一：
+需要先安装 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)；本轮已在 DSH Web `0.1.7-rc.2` 检查原生控件，macOS Desktop 由用户试用；Windows Desktop 仍需更新后的实机反馈。安装本身可以在 DSH 运行时执行（只改动磁盘配置），重启后生效。三种方式任选其一：
 
 > 安装前请确保已关闭其他皮肤插件，避免冲突。
 
@@ -83,10 +83,10 @@ dsh --profile web --dump-config | grep -B1 -A2 liang-intensity
 
 ### 方式二：从 GitHub Release tarball 安装
 
-从本仓库 [Releases](https://github.com/kingOfSoySauce/dsh-liang-skin/releases) 页面下载 `dsh-client-liang-intensity-skin-0.1.9.tgz`（包内已包含构建好的 `lib/client.js`，安装时不需要执行任何 prepare 脚本），然后：
+从本仓库 [Releases](https://github.com/kingOfSoySauce/dsh-liang-skin/releases) 页面下载 `leon___-dsh-client-liang-intensity-skin-0.1.11.tgz`（包内已包含构建好的 `lib/client.js`，安装时不需要执行任何 prepare 脚本），然后：
 
 ```sh
-dsh plugin --profile web add ./dsh-client-liang-intensity-skin-0.1.9.tgz
+dsh plugin --profile web add ./leon___-dsh-client-liang-intensity-skin-0.1.11.tgz
 ```
 
 
@@ -117,7 +117,7 @@ dsh plugin --profile web add .
 ### 卸载
 
 ```sh
-dsh plugin --profile web remove dsh-client-liang-intensity-skin
+dsh plugin --profile web remove @leon___/dsh-client-liang-intensity-skin
 ```
 
 `remove` 会自动把插件从 `dsh.profile.bundles` 中摘除；重启后设置入口完全移除。
@@ -140,7 +140,7 @@ npm run test:compatibility
 
 修改 client 源码后需要运行 `npm run build`，并一起提交更新后的 `lib/client.js` 和 source map。
 
-浏览器兼容性回归使用本机 Chrome / Chromium；可通过 `CHROME_PATH` 指定浏览器可执行文件，不会自动下载浏览器。测试使用宿主布局夹具，不能代替官方 Desktop 真机验收。本轮未发布修复的验证步骤见 [兼容性验证说明](docs/compatibility-validation.md)。
+浏览器兼容性回归使用本机 Chrome / Chromium；可通过 `CHROME_PATH` 指定浏览器可执行文件，不会自动下载浏览器。测试使用宿主布局夹具，不能代替官方 Desktop 真机验收。本轮兼容性修复的验证步骤见 [兼容性验证说明](docs/compatibility-validation.md)。
 
 ## 灵感与素材来源
 

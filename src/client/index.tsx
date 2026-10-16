@@ -11,13 +11,14 @@ import type {} from "@deepseek-ai/dsh-client-ui-conversation/client";
 import type {} from "@deepseek-ai/dsh-client-ui-settings/client";
 import type {} from "@deepseek-ai/dsh-client-ui-model-selection/client";
 import styles from "./skin.css";
+import { installLiangAppearanceButton } from "./appearance";
+import { createPortraitLoader } from "./portrait-loader";
 import {
   PREVIEW_MAX_FRAME,
   frameForEffort,
   indicatorLabel,
   nearestEffortIndex,
   paletteForFrame,
-  portraitBlendForLevel,
   selectedEffortIndex,
   type EffortLike,
 } from "./logic";
@@ -25,7 +26,6 @@ import {
 const PACKAGE_ID = "dsh-client-liang-intensity-skin";
 const LOCALE_NAMESPACE = "liang.skin";
 const ASSET_PREFIX = `/plugins/${PACKAGE_ID}/assets`;
-const FIRST_PORTRAIT_FILE = "portrait-source-v2/stage-00.webp";
 const BIND_EFFORT_KEY = "dsh-liang-intensity-skin.bind-effort";
 
 const PORTRAIT_ANCHORS = [
@@ -54,8 +54,6 @@ const PORTRAIT_ANCHORS = [
   { level: 29, file: "level-29.webp" },
   { level: 30, file: "stage-30.webp" },
 ] as const;
-
-const ANCHOR_LEVELS = PORTRAIT_ANCHORS.map((anchor) => anchor.level);
 
 interface SkinSettings {
   enabled: boolean;
@@ -142,9 +140,7 @@ class SkinPresenter {
   private readonly scope: PreferenceStore;
   private readonly theme: ThemeService;
   private readonly root: HTMLDivElement;
-  private readonly portrait: HTMLImageElement;
-  private readonly preloads: HTMLImageElement[];
-  private portraitReady = false;
+  private readonly portraits: ReturnType<typeof createPortraitLoader>;
   private enabled = true;
   // Default to the max frame so the first paint after load is the dark shell;
   // starting at 0 flashed the light palette before the directory resolved.
@@ -160,61 +156,33 @@ class SkinPresenter {
     this.root = document.createElement("div");
     this.root.className = "liang-skin-backdrop";
     this.root.dataset.plugin = PACKAGE_ID;
-    // Show the first half-body frame immediately while the remaining frames
-    // are fetched and decoded. A request being complete does not mean the
-    // bitmap is ready for a tear-free first swap.
-    this.root.dataset.media = "sequence";
+    this.root.dataset.media = "color";
     this.root.setAttribute("aria-hidden", "true");
-
-    this.portrait = document.createElement("img");
-    this.portrait.className = "liang-skin-sequence-frame";
-    this.portrait.alt = "";
-    this.portrait.draggable = false;
-    this.portrait.decoding = "async";
-    this.portrait.src = `${ASSET_PREFIX}/${FIRST_PORTRAIT_FILE}`;
-    this.portrait.addEventListener("error", this.handleSequenceError);
-
-    this.preloads = PORTRAIT_ANCHORS.map(({ file }) => {
-      const image = new Image();
-      image.loading = "eager";
-      image.decoding = "async";
-      image.src = `${ASSET_PREFIX}/portrait-source-v2/${file}`;
-      return image;
-    });
-
-    // `new Image()` starts the requests, but the browser may still defer
-    // decoding until the image is attached to the document. Wait for all
-    // frames up front so the first slider interaction never reveals a blank
-    // or half-painted frame.
-    void Promise.all(this.preloads.map((image) => image.decode())).then(
-      () => {
-        if (this.disposed) return;
-        this.portraitReady = true;
+    this.portraits = createPortraitLoader({
+      sources: PORTRAIT_ANCHORS.map(({ level, file }) => ({
+        level,
+        url: `${ASSET_PREFIX}/portrait-source-v2/${file}`,
+      })),
+      onChange: ({ image }) => {
+        if (this.disposed || !this.enabled) return;
+        if (image === null) {
+          this.root.dataset.media = "color";
+          this.root.replaceChildren();
+          return;
+        }
+        // Reuse the decoded node so a frame swap cannot start a second fetch.
+        const portrait = image as HTMLImageElement;
+        portrait.className = "liang-skin-sequence-frame";
+        portrait.alt = "";
+        portrait.draggable = false;
+        if (this.root.firstChild !== portrait) this.root.replaceChildren(portrait);
         this.root.dataset.media = "sequence";
-        this.updatePortrait(paletteForFrame(this.frame).level);
       },
-      () => {
-        // Keep the already-visible first half-body frame if another optional
-        // frame cannot be decoded. It is still a valid skin fallback.
-      },
-    );
-
-    this.root.append(this.portrait);
-    document.body.prepend(this.root);
+    });
 
     this.unsubscribe = scope.subscribe(() => this.syncSettings());
     this.syncSettings();
   }
-
-  private readonly handleSequenceError = () => {
-    if (this.portrait.src.endsWith(FIRST_PORTRAIT_FILE)) {
-      this.root.dataset.media = "color";
-      return;
-    }
-    this.portraitReady = false;
-    this.portrait.src = `${ASSET_PREFIX}/${FIRST_PORTRAIT_FILE}`;
-    this.root.dataset.media = "sequence";
-  };
 
   private syncSettings() {
     this.setEnabled(this.scope.getSnapshot().enabled);
@@ -229,13 +197,20 @@ class SkinPresenter {
   }
 
   setEnabled(enabled: boolean) {
+    if (this.disposed) return;
     this.enabled = enabled;
     if (enabled) {
       if (!this.root.isConnected) document.body.prepend(this.root);
       document.body.dataset.liangSkin = "on";
       this.applyFrame();
+      this.portraits.start();
     } else {
+      if (this.raf !== 0) cancelAnimationFrame(this.raf);
+      this.raf = 0;
       this.root.remove();
+      this.portraits.stop();
+      this.root.replaceChildren();
+      this.root.dataset.media = "color";
       delete document.body.dataset.liangSkin;
       delete document.body.dataset.liangStage;
       for (const name of cssVariables) document.body.style.removeProperty(name);
@@ -243,6 +218,7 @@ class SkinPresenter {
   }
 
   setFrame(frame: number) {
+    if (this.disposed) return;
     this.pendingFrame = Math.min(PREVIEW_MAX_FRAME, Math.max(0, Math.round(frame)));
     this.frame = this.pendingFrame;
     if (!this.enabled) return;
@@ -255,6 +231,7 @@ class SkinPresenter {
   }
 
   private applyFrame() {
+    if (this.disposed || !this.enabled) return;
     const palette = paletteForFrame(this.frame);
     const body = document.body;
     this.syncNativeTheme(palette.stage === 5 ? "dark" : "light");
@@ -283,16 +260,7 @@ class SkinPresenter {
   }
 
   private updatePortrait(level: number) {
-    if (!this.portraitReady) return;
-    const { lowerIndex, upperIndex, mix } = portraitBlendForLevel(
-      level,
-      ANCHOR_LEVELS,
-    );
-    const lower = PORTRAIT_ANCHORS[lowerIndex];
-    const upper = PORTRAIT_ANCHORS[upperIndex];
-    const selected = mix >= 0.5 ? upper : lower;
-    const source = `${ASSET_PREFIX}/portrait-source-v2/${selected.file}`;
-    if (this.portrait.getAttribute("src") !== source) this.portrait.src = source;
+    this.portraits.select(level);
   }
 
   async choose(enabled: boolean) {
@@ -310,8 +278,7 @@ class SkinPresenter {
     this.disposed = true;
     this.unsubscribe();
     if (this.raf !== 0) cancelAnimationFrame(this.raf);
-    this.portrait.removeEventListener("error", this.handleSequenceError);
-    for (const image of this.preloads) image.src = "";
+    this.portraits.dispose();
     this.root.remove();
     document.body.removeAttribute("data-liang-skin");
     delete document.body.dataset.liangStage;
@@ -590,141 +557,6 @@ function AppearanceSkinRow({ scope, presenter, theme, subscribeTheme, t }: Setti
   );
 }
 
-const NATIVE_APPEARANCE_GROUP = '[class*="_8HJdBW_group"]';
-const NATIVE_APPEARANCE_ROW = '[class*="_8HJdBW_cubeRow"]';
-const LIANG_APPEARANCE_BUTTON = "liang-appearance-choice";
-const LIANG_BINDING_CONTROL = "liang-appearance-binding";
-const LIANG_BINDING_INPUT = "liang-appearance-binding__input";
-
-function installLiangAppearanceButton(scope: PreferenceStore, presenter: SkinPresenter) {
-  let pending = false;
-  const hookedNativeButtons = new Set<HTMLButtonElement>();
-  const nativeClickHandlers = new Map<HTMLButtonElement, () => void>();
-
-  const sync = () => {
-    const group = [...document.querySelectorAll<HTMLElement>(NATIVE_APPEARANCE_GROUP)]
-      .find((node) => node.querySelector('[class*="_8HJdBW_themeCube"]'));
-    const row = group?.querySelector<HTMLElement>(NATIVE_APPEARANCE_ROW);
-    if (row === undefined || row === null) return;
-
-    let customButton = row.querySelector<HTMLButtonElement>(`.${LIANG_APPEARANCE_BUTTON}`);
-    if (customButton === null) {
-      customButton = document.createElement("button");
-      customButton.className = LIANG_APPEARANCE_BUTTON;
-      customButton.type = "button";
-      customButton.dataset.plugin = PACKAGE_ID;
-      customButton.setAttribute("aria-label", "滑动变祖");
-
-      const icon = document.createElement("span");
-      icon.className = "liang-appearance-choice__icon";
-      icon.setAttribute("aria-hidden", "true");
-      icon.textContent = "◈";
-
-      const label = document.createElement("span");
-      label.className = "liang-appearance-choice__label";
-      label.textContent = document.documentElement.lang.toLowerCase().startsWith("en")
-        ? "Slider"
-        : "滑动变祖";
-      customButton.append(icon, label);
-      customButton.addEventListener("click", () => {
-        if (pending || scope.getSnapshot().enabled) return;
-        pending = true;
-        sync();
-        void presenter.choose(true).finally(() => {
-          pending = false;
-          sync();
-        });
-      });
-    }
-
-    if (customButton.parentElement !== row) row.append(customButton);
-    const snapshot = scope.getSnapshot();
-    customButton.disabled = pending;
-    customButton.setAttribute("aria-pressed", String(snapshot.enabled));
-
-    let bindingControl = group.querySelector<HTMLElement>(`.${LIANG_BINDING_CONTROL}`);
-    if (!snapshot.enabled) {
-      bindingControl?.remove();
-      bindingControl = null;
-    } else if (bindingControl === null) {
-      bindingControl = document.createElement("label");
-      bindingControl.className = LIANG_BINDING_CONTROL;
-      bindingControl.dataset.plugin = PACKAGE_ID;
-
-      const bindingCopy = document.createElement("span");
-      bindingCopy.className = "liang-appearance-binding__copy";
-
-      const bindingLabel = document.createElement("span");
-      bindingLabel.className = "liang-appearance-binding__label";
-      const bindingText = document.documentElement.lang.toLowerCase().startsWith("en")
-        ? "Bind slider to reasoning level"
-        : "滑动变祖绑定思考等级";
-      bindingLabel.textContent = bindingText;
-
-      const bindingDescription = document.createElement("span");
-      bindingDescription.className = "liang-appearance-binding__description";
-      bindingDescription.id = "liang-appearance-binding-description";
-      bindingDescription.textContent = document.documentElement.lang.toLowerCase().startsWith("en")
-        ? "When off, the slider does not change the reasoning level."
-        : "关闭之后滑块不联动思考等级";
-      bindingCopy.append(bindingLabel, bindingDescription);
-
-      const bindingInput = document.createElement("input");
-      bindingInput.className = LIANG_BINDING_INPUT;
-      bindingInput.type = "checkbox";
-      bindingInput.setAttribute("role", "switch");
-      bindingInput.setAttribute("aria-label", bindingText);
-      bindingInput.setAttribute("aria-describedby", bindingDescription.id);
-      bindingInput.addEventListener("change", () => {
-        void scope.setBindEffort(bindingInput.checked).catch(() => sync());
-      });
-
-      bindingControl.append(bindingCopy, bindingInput);
-      group.append(bindingControl);
-    }
-
-    if (bindingControl !== null) {
-      const bindingInput = bindingControl.querySelector<HTMLInputElement>(`.${LIANG_BINDING_INPUT}`);
-      if (bindingInput !== null) {
-        bindingInput.checked = snapshot.bindEffort;
-        bindingInput.setAttribute("aria-checked", String(snapshot.bindEffort));
-        bindingInput.disabled = pending;
-      }
-    }
-
-    for (const nativeButton of row.querySelectorAll<HTMLButtonElement>('[class*="_8HJdBW_themeCube"]')) {
-      if (hookedNativeButtons.has(nativeButton)) continue;
-      hookedNativeButtons.add(nativeButton);
-      const handleNativeClick = () => {
-        if (pending || !scope.getSnapshot().enabled) return;
-        pending = true;
-        sync();
-        void presenter.choose(false).finally(() => {
-          pending = false;
-          sync();
-        });
-      };
-      nativeClickHandlers.set(nativeButton, handleNativeClick);
-      nativeButton.addEventListener("click", handleNativeClick, { capture: true });
-    }
-  };
-
-  const observer = new MutationObserver(sync);
-  observer.observe(document.body, { childList: true, subtree: true });
-  const unsubscribe = scope.subscribe(sync);
-  sync();
-
-  return () => {
-    observer.disconnect();
-    unsubscribe();
-    for (const [nativeButton, handleNativeClick] of nativeClickHandlers) {
-      nativeButton.removeEventListener("click", handleNativeClick, { capture: true });
-    }
-    document.querySelectorAll(`.${LIANG_APPEARANCE_BUTTON}`).forEach((button) => button.remove());
-    document.querySelectorAll(`.${LIANG_BINDING_CONTROL}`).forEach((control) => control.remove());
-  };
-}
-
 export const inject = [
   "slots",
   "sessions",
@@ -795,7 +627,7 @@ export function apply(ctx: ClientContext) {
   const presenter = new SkinPresenter(scope, theme);
   ctx.effect(() => () => presenter.dispose(), "liang-intensity-skin: backdrop presenter");
   ctx.effect(
-    () => installLiangAppearanceButton(scope, presenter),
+    () => installLiangAppearanceButton(scope, presenter, PACKAGE_ID),
     "liang-intensity-skin: native appearance extension",
   );
   ctx.effect(

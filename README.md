@@ -60,10 +60,11 @@ dsh plugin --profile web add 'github:kingOfSoySauce/dsh-liang-skin'
 
 - `滑动变祖`：显示滑块并启用人物、背景和自适应配色。
 - `原生`：移除背景层、皮肤变量和滑块，恢复 Harness 原生界面。
+- `滑动变祖绑定思考等级`：关闭后滑块只切换人物和配色，不修改模型的推理等级。
 
 皮肤保持启用时，人物与背景配色由滑块档位决定；切换 DSH 原生深浅主题不会改变当前档位的背景。
 
-选择保存在当前浏览器本地，不会改动模型配置。
+绑定开关保存在当前浏览器本地。切回原生外观只对本次客户端激活有效；刷新页面或重新激活插件后默认开启皮肤。外观选择的跨刷新记忆暂未实现。绑定开启时，滑块会提交模型的推理档位；关闭绑定后只改变外观。
 
 <a id="cli-install"></a>
 
@@ -134,9 +135,12 @@ dsh plugin --profile web remove dsh-client-liang-intensity-skin
 npm install
 npm test
 npm run build
+npm run test:compatibility
 ```
 
 修改 client 源码后需要运行 `npm run build`，并一起提交更新后的 `lib/client.js` 和 source map。
+
+浏览器兼容性回归使用本机 Chrome / Chromium；可通过 `CHROME_PATH` 指定浏览器可执行文件，不会自动下载浏览器。测试使用宿主布局夹具，不能代替官方 Desktop 真机验收。本轮未发布修复的验证步骤见 [兼容性验证说明](docs/compatibility-validation.md)。
 
 ## 灵感与素材来源
 

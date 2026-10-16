@@ -1,6 +1,6 @@
 .liang-skin-backdrop {
   position: fixed;
-  z-index: 0;
+  z-index: -1;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
@@ -19,7 +19,7 @@ body[data-liang-skin="on"] .liang-skin-backdrop {
   right: 0;
   display: block;
   width: min(42vw, 720px);
-  height: 100vh;
+  height: 100%;
   object-fit: cover;
   object-position: 50% 42%;
   opacity: var(--liang-portrait-opacity, 0.45);
@@ -46,11 +46,16 @@ body[data-liang-skin="on"] .liang-skin-backdrop {
   position: absolute;
   inset: 0;
   content: "";
-  background: linear-gradient(90deg, var(--liang-page, transparent) 0 28%, transparent 57% 100%);
+  background:
+    linear-gradient(90deg, var(--liang-page, transparent) 0 28%, transparent 57% 100%),
+    linear-gradient(var(--liang-bg-base, transparent), var(--liang-bg-base, transparent));
 }
 
 body[data-liang-skin="on"] {
-  --dsw-alias-bg-base: var(--liang-bg-base) !important;
+  /* Keep the backdrop above the canvas but below content and native portals.
+     The host owns root positioning, dimensions, and its own stacking order. */
+  isolation: isolate;
+  --dsw-alias-bg-base: transparent !important;
   --dsw-alias-bg-layer-1: var(--liang-layer-1) !important;
   --dsw-alias-bg-layer-2: var(--liang-layer-2) !important;
   --dsw-alias-bg-layer-3: var(--liang-layer-3) !important;
@@ -210,9 +215,14 @@ body[data-liang-skin="on"]:is(
 }
 
 body[data-liang-skin="on"] > #root {
-  position: relative;
-  z-index: 1;
   background: transparent !important;
+}
+
+body[data-liang-skin="on"]:is(
+  [data-dsh-desktop-mode="compatibility"],
+  [data-dsh-desktop-mode="extended"]
+) .liang-skin-backdrop {
+  top: var(--dsh-desktop-frame-height, 0px);
 }
 
 /* Windows paints the sidebar fill across the host frame, covering the portrait.
@@ -451,7 +461,7 @@ body[data-liang-skin="on"] .liang-effort-control__range::-webkit-slider-thumb {
   display: flex;
 }
 
-[class*="_8HJdBW_cubeRow"]:has(.liang-appearance-choice) {
+[class*="_cubeRow"]:has(.liang-appearance-choice) {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }

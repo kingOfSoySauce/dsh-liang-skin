@@ -48,7 +48,8 @@
   ],
   "scripts": {
     "build": "node ./scripts/build-client.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:compatibility": "npm run build && node ./scripts/test-client-compatibility.mjs && node ./scripts/test-client-runtime.mjs"
   },
   "dsh": {
     "bundle": {
@@ -70,6 +71,7 @@
   "devDependencies": {
     "@types/react": "~18.3.1",
     "esbuild": "^0.25.0",
+    "playwright-core": "^1.64.1",
     "vitest": "^4.1.10"
   }
 }

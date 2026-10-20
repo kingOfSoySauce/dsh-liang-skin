@@ -11,7 +11,11 @@ const projectRoot = fileURLToPath(new URL("../", import.meta.url));
 const packageId = "@leon___/dsh-client-liang-intensity-skin";
 const viewport = { width: 1100, height: 700 };
 const css = await readFile(new URL("../src/client/skin.css", import.meta.url), "utf8");
-const compiled = await build({ absWorkingDir: projectRoot, entryPoints: ["src/client/appearance.ts"],
+const compiled = await build({ absWorkingDir: projectRoot,
+  stdin: { resolveDir: projectRoot, contents: `
+    export { installLiangAppearanceButton } from './src/client/appearance.ts';
+    export { paletteForFrame, PREVIEW_MAX_FRAME } from './src/client/logic.ts';
+  ` },
   bundle: true, write: false, format: "iife", globalName: "LiangAppearance", platform: "browser", target: "es2022" });
 
 async function chromeExecutable() {
@@ -232,6 +236,131 @@ async function appearanceChecks(page, hash) {
   assert.equal(await page.locator(".liang-appearance-choice, .liang-appearance-binding").count(), 0);
 }
 
+// Account settings are a body portal, not a generic modal. Match the audited
+// Host structure while using different build hashes and multiple class names.
+async function overlayChecks(context) {
+  let scenarios = 0;
+  for (const hash of ["oldAccount42", "_44HXVa"]) {
+    const { page, errors } = await prepare(context, { enabled: false });
+    await page.evaluate(hash => {
+      const style = document.createElement("style");
+      style.textContent = `
+        body { --dsw-alias-label-primary: rgb(34 38 42); --dsw-alias-label-secondary: rgb(75 81 87);
+          --dsw-alias-border-l1: rgb(180 184 188); --dsw-radius-sm: 4px; }
+        [data-account-host-fixture] { position: fixed; inset: 0; z-index: 1001;
+          display: flex; flex-direction: column; background: var(--dsw-alias-bg-base); }
+        html[data-windows-titlebar] [data-account-host-fixture] { padding-top: var(--dsh-windows-titlebar-height); }
+        [data-account-host-fixture] > header { -webkit-app-region: initial; box-sizing: border-box;
+          border-bottom: .5px solid var(--dsw-alias-border-l1); flex: none; height: 48px; padding: 6px 16px; }
+        [data-account-host-fixture] .controls { display: flex; align-items: center; gap: 24px; padding-top: 5px; }
+        [data-account-host-fixture] button { box-sizing: border-box; border-radius: var(--dsw-radius-sm);
+          height: 28px; color: var(--dsw-alias-label-secondary); font: inherit; white-space: nowrap;
+          cursor: pointer; background: transparent; border: none; justify-content: center; align-items: center;
+          gap: 8px; padding: 0 6px; font-size: 14px; line-height: 22px; display: inline-flex; }
+        [data-account-host-fixture] > [class*="_viewport"] { min-height: 0;
+          color: var(--dsw-alias-label-secondary); flex: 1; position: relative; }
+        [data-native-overlay-sentinel] { position: fixed; left: -2000px; width: 100px;
+          height: 60px; --dsw-alias-bg-base: rgb(201 183 165);
+          background: rgb(201 183 165); color: rgb(35 47 59); }
+        [data-native-overlay-sentinel] > header { background: rgb(190 170 150); }
+        #nested-account { inset: auto auto 0 -2000px; width: 100px; height: 60px;
+          --dsw-alias-bg-base: rgb(210 190 170); --dsw-alias-label-secondary: rgb(35 47 59); }
+      `;
+      document.querySelector("#liang-styles").before(style);
+      const accountMarkup = (id, nested = false) => `
+        <div id="${id}" data-account-host-fixture role="dialog" aria-modal="true"
+          class="native-screen ${hash}_overlay extra-overlay">
+          <header data-window-drag class="${hash}_header extra-header">
+            <div class="controls ${hash}_controls">
+              <button id="${nested ? "nested-back" : "account-back"}" type="button"
+                class="native-control ${hash}_back extra-back" aria-label="返回">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M10 3 5 8l5 5" stroke="currentColor" stroke-width="2"/>
+                </svg><span>返回</span>
+              </button>
+            </div>
+          </header>
+          <div class="native-scroll ${hash}_viewport extra-viewport"></div>
+        </div>`;
+      document.querySelector("#root").insertAdjacentHTML("beforeend", accountMarkup("nested-account", true));
+      document.body.insertAdjacentHTML("beforeend", `
+        <div id="ordinary-modal" role="dialog" aria-modal="true" data-native-overlay-sentinel
+          class="native-modal ${hash}_dialog extra-dialog">
+          <header data-window-drag><button class="${hash}_back">Back</button></header>
+          <div class="${hash}_viewport"></div>
+        </div>
+        <div id="ordinary-menu" role="menu" data-native-overlay-sentinel
+          class="native-menu ${hash}_overlay extra-menu"><button role="menuitem">Item</button></div>
+        ${accountMarkup("account-overlay")}`);
+      window.accountBackClicks = 0;
+      document.querySelector("#account-back").addEventListener("click", () => window.accountBackClicks++);
+      window.overlayFixture = {
+        applyPalette(frame) {
+          const palette = window.LiangAppearance.paletteForFrame(frame);
+          const mapping = { page: "page", base: "bg-base", layer1: "layer-1", layer2: "layer-2",
+            layer3: "layer-3", sidebar: "sidebar", ink: "ink", secondary: "secondary",
+            tertiary: "tertiary", border: "border", accent: "accent", accentHover: "accent-hover",
+            hover: "hover", portraitOpacity: "portrait-opacity" };
+          for (const [key, variable] of Object.entries(mapping)) {
+            document.body.style.setProperty(`--liang-${variable}`, palette[key]);
+          }
+          document.body.dataset.liangStage = String(palette.stage);
+          return palette;
+        },
+        snapshot() {
+          const read = element => {
+            const computed = getComputedStyle(element);
+            return { background: computed.backgroundColor, color: computed.color,
+              base: computed.getPropertyValue("--dsw-alias-bg-base").trim() };
+          };
+          const overlay = document.querySelector("#account-overlay");
+          return { overlay: read(overlay), header: read(overlay.querySelector("header")),
+            back: read(overlay.querySelector("button")), viewport: read(overlay.querySelector('[class*="_viewport"]')),
+            sentinels: [...document.querySelectorAll('#ordinary-modal, #ordinary-modal > header, #ordinary-menu, #nested-account, #nested-account > header, #nested-back, #nested-account > [class*="_viewport"]')].map(read) };
+        },
+      };
+    }, hash);
+    const maxFrame = await page.evaluate(() => window.LiangAppearance.PREVIEW_MAX_FRAME);
+    for (const { name, frame, stage } of [
+      { name: "light", frame: 0, stage: 0 },
+      { name: "black-gold", frame: maxFrame, stage: 5 },
+    ]) {
+      await page.evaluate(() => window.fixture.setEnabled(false));
+      const palette = await page.evaluate(frame => window.overlayFixture.applyPalette(frame), frame);
+      assert.equal(palette.stage, stage, "Use the actual internal maximum frame for black-gold");
+      const native = await page.evaluate(() => window.overlayFixture.snapshot());
+      await page.evaluate(() => window.fixture.setEnabled(true));
+      const active = await page.evaluate(() => window.overlayFixture.snapshot());
+      const expectedPage = `rgb(${palette.page.match(/\d+/g).join(", ")})`;
+      const expectedSecondary = `rgb(${palette.secondary.match(/\d+/g).join(", ")})`;
+      assert.equal(active.overlay.background, expectedPage, `${hash}/${name}: account overlay restores an opaque page surface`);
+      assert.equal(active.overlay.base, palette.page, `${hash}/${name}: background token is local to the account overlay`);
+      assert.equal(active.viewport.background, "rgba(0, 0, 0, 0)", "Keep the native transparent viewport");
+      assert.equal(active.viewport.base, palette.page, `${hash}/${name}: viewport inherits the locally restored base token`);
+      assert.equal(active.viewport.color, expectedSecondary, "Keep the native viewport secondary text color");
+      assert.equal(active.header.background, "rgba(0, 0, 0, 0)", "Keep the native transparent header");
+      assert.equal(active.back.background, "rgba(0, 0, 0, 0)", "Keep the native transparent back button");
+      assert.equal(active.back.color, expectedSecondary, `${hash}/${name}: back icon and label use the native secondary text token`);
+      assert.equal(await page.locator("#account-overlay > header").evaluate(element => getComputedStyle(element).height), "48px");
+      assert.equal(await page.locator("#account-back").evaluate(element => getComputedStyle(element).height), "28px");
+      const pageRgb = palette.page.match(/\d+/g).map(Number);
+      closeColor(await pixelAt(page, 500, 20), pageRgb, `${hash}/${name}: header paints over the opaque account surface`);
+      closeColor(await pixelAt(page, 1070, 430), pageRgb, `${hash}/${name}: portrait does not bleed through the account viewport`);
+      assert.deepEqual(active.sentinels, native.sentinels, "Account styles must not affect ordinary modals, menus, or non-body portals");
+      const clicks = await page.evaluate(() => window.accountBackClicks);
+      await page.locator("#account-back").click();
+      assert.equal(await page.evaluate(() => window.accountBackClicks), clicks + 1, "Native back button remains clickable");
+      await page.evaluate(() => window.fixture.setEnabled(false));
+      assert.deepEqual(await page.evaluate(() => window.overlayFixture.snapshot()), native, "Disabling the skin restores every native overlay style");
+      scenarios++;
+      console.log(`PASS account overlay ${hash}/${name}: opaque portal, native header/back, ordinary modal/menu boundaries, skin-off restore`);
+    }
+    assert.deepEqual(errors, [], `${hash}: overlay browser errors`);
+    await page.close();
+  }
+  return scenarios;
+}
+
 const browser = await chromium.launch({ executablePath: await chromeExecutable(), headless: true });
 try {
   const context = await browser.newContext({ viewport, reducedMotion: "reduce", deviceScaleFactor: 1 });
@@ -262,7 +391,9 @@ try {
   assert.equal(await second.page.evaluate(() => window.fixture.snapshot().enabled), true);
   closeColor(await pixelAt(first.page, 1070, 430), [240, 244, 248], "First window skin off");
   closeColor(await pixelAt(second.page, 1070, 430), [24, 156, 72], "Second window remains visible");
-  assert.deepEqual([...first.errors, ...second.errors], []); await context.close();
+  assert.deepEqual([...first.errors, ...second.errors], []);
+  const overlayScenarios = await overlayChecks(context);
+  await context.close();
   console.log("PASS independent windows: host geometry and appearance state stay isolated");
-  console.log("Client compatibility browser checks passed (11 scenarios). Native Desktop validation remains manual.");
+  console.log(`Client compatibility browser checks passed (${cases.length + 3 + overlayScenarios} scenarios). Native Desktop validation remains manual.`);
 } finally { await browser.close(); }

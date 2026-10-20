@@ -225,6 +225,13 @@ body[data-liang-skin="on"]:is(
   top: var(--dsh-desktop-frame-height, 0px);
 }
 
+/* Native account pages are full-screen body portals. Their header and loading
+   surface must stay opaque when the chat background token is transparent. */
+body[data-liang-skin="on"] > [role="dialog"][aria-modal="true"][class*="_overlay"]:has(> header[data-window-drag] button[class*="_back"]):has(> [class*="_viewport"]) {
+  --dsw-alias-bg-base: var(--liang-page, #fff) !important;
+  background: var(--liang-page, #fff) !important;
+}
+
 /* Windows paints the sidebar fill across the host frame, covering the portrait.
    Match macOS's transparent frame while keeping the sidebar, caption, and
    conversation surfaces painted by their own host rules. */

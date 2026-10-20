@@ -34,3 +34,9 @@ DSH Web：可用 `dsh plugin --profile web add /绝对路径/测试包.tgz` 安�
 ## Issue / PR 收尾
 
 已确认可收尾的 #2、#3、#6 关闭。#8、#12、#14、#15 与 PR #10、#13 在用户验证前保持开放；PR #9 留待后续处理。
+
+## 后续：DSH 0.2.1-rc.2 账号页面
+
+已核对[官方固定发布源码](https://github.com/deepseek-ai/deepseek-harness/blob/687f282e8625c6b8d11ff58211a90524be2e4317/packages/client/ui-settings-account/src/client/PlatformOverlay.module.css)及对应 npm 产物：账号用量/充值页覆盖层仍继承背景 token，48px 返回栏没有独立底色。皮肤新增局部规则，仅为 body 直属、带原生拖拽返回栏和 viewport 的模态覆盖层恢复配色背景。
+
+验收：分别在浅色和黑金档打开用量/充值页，确认返回栏与加载状态背景不透明、返回按钮清晰可用；普通弹窗、菜单和聊天背景保持原行为。停用皮肤后恢复宿主背景。自动化只使用宿主结构夹具，不登录账号，也不替代原生 Desktop 验收。

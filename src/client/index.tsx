@@ -15,12 +15,15 @@ import styles from "./skin.css";
 import { installLiangAppearanceButton } from "./appearance";
 import { createPortraitLoader } from "./portrait-loader";
 import {
+  FINE_STEPS,
   PREVIEW_MAX_FRAME,
   frameForEffort,
+  frameForLevel,
   indicatorLabel,
   nearestEffortIndex,
   paletteForFrame,
   selectedEffortIndex,
+  snapFrame,
   type EffortLike,
 } from "./logic";
 
@@ -326,6 +329,12 @@ function LiangEffortSlider({ directory, load, select, presenter, scope }: Slider
   const [interacting, setInteracting] = useState(false);
   const dragging = useRef(false);
   const dragStartFrame = useRef(frame);
+  // Effort index this slider committed itself, and the last index the effect
+  // observed. The effect must only follow *external* effort changes (model
+  // switch, native picker); otherwise a selection round-trip would re-render
+  // with the stale index and yank the thumb off the fine stop the user chose.
+  const selfCommitted = useRef(-1);
+  const lastCommitted = useRef(committedIndex);
   const enabled = skin.enabled;
 
   useEffect(() => {
@@ -333,10 +342,16 @@ function LiangEffortSlider({ directory, load, select, presenter, scope }: Slider
   }, [enabled, load]);
 
   useEffect(() => {
+    const previous = lastCommitted.current;
+    lastCommitted.current = committedIndex;
     if (!bindEffort || dragging.current || pending) return;
+    // Same effort as before, or the host just caught up with our own submit:
+    // keep the fine stop instead of snapping back to the effort anchor.
+    if (committedIndex === previous) return;
+    if (selfCommitted.current === committedIndex) return;
     setFrame(committedFrame);
     presenter.setFrame(committedFrame);
-  }, [bindEffort, committedFrame, pending, presenter]);
+  }, [bindEffort, committedFrame, committedIndex, pending, presenter]);
 
   if (!enabled) return null;
   if (bindEffort && (reasoning === null || efforts.length < 2)) return null;
@@ -344,7 +359,7 @@ function LiangEffortSlider({ directory, load, select, presenter, scope }: Slider
   const previewIndex = nearestEffortIndex(frame, efforts);
   const previewEffort = efforts[previewIndex];
   const progressRatio = frame / PREVIEW_MAX_FRAME;
-  const tooltipLabel = indicatorLabel(frame, bindEffort ? efforts : []);
+  const tooltipLabel = indicatorLabel(frame, bindEffort ? efforts : [], { withLevel: true });
 
   const commit = async (rawFrame: number) => {
     if (!bindEffort) {
@@ -353,11 +368,15 @@ function LiangEffortSlider({ directory, load, select, presenter, scope }: Slider
       presenter.setFrame(rawFrame);
       return;
     }
-    const targetIndex = nearestEffortIndex(rawFrame, efforts);
+    // Land on the fine grid instead of jumping to the effort anchor: the
+    // slider now has FINE_STEPS + 1 usable positions, and only the submitted
+    // id is rounded to the nearest effort the model actually offers.
+    const targetFrame = snapFrame(rawFrame);
+    const targetIndex = nearestEffortIndex(targetFrame, efforts);
     const target = efforts[targetIndex];
     if (target === undefined) return;
-    const targetFrame = frameForEffort(targetIndex, efforts.length);
     dragging.current = false;
+    selfCommitted.current = targetIndex;
     setFrame(targetFrame);
     presenter.setFrame(targetFrame);
     if (targetIndex === committedIndex || pending) return;
@@ -392,6 +411,13 @@ function LiangEffortSlider({ directory, load, select, presenter, scope }: Slider
         </output>
       )}
       <div className="liang-effort-control__ticks" aria-hidden="true">
+        {Array.from({ length: FINE_STEPS + 1 }, (_, level) => (
+          <i
+            className="liang-effort-control__tick liang-effort-control__tick--minor"
+            key={`fine-${level}`}
+            style={{ left: `${(frameForLevel(level) / PREVIEW_MAX_FRAME) * 100}%` }}
+          />
+        ))}
         {efforts.map((effort, index) => (
           <i
             className="liang-effort-control__tick"

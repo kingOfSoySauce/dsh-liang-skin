@@ -64,6 +64,28 @@ export function frameForEffort(index: number, count: number): number {
   return Math.round((safe / (count - 1)) * PREVIEW_MAX_FRAME);
 }
 
+/**
+ * Fine subdivision of the 0–30 intensity scale. The model wire only accepts
+ * off/low/high/max, so these stops are visual: every stop still submits the
+ * nearest real effort id while the skin keeps the exact sub-level.
+ */
+export const FINE_STEPS = MAX_LEVEL;
+export const FRAMES_PER_STEP = PREVIEW_MAX_FRAME / FINE_STEPS;
+
+export function frameForLevel(level: number): number {
+  const safe = Number.isFinite(level) ? Math.min(MAX_LEVEL, Math.max(0, Math.round(level))) : 0;
+  return Math.round((safe / FINE_STEPS) * PREVIEW_MAX_FRAME);
+}
+
+export function levelForFrame(rawFrame: number): number {
+  return Math.round((clampFrame(rawFrame) / PREVIEW_MAX_FRAME) * FINE_STEPS);
+}
+
+/** Snap a preview frame onto the fine grid so the thumb stays where it landed. */
+export function snapFrame(rawFrame: number): number {
+  return frameForLevel(levelForFrame(rawFrame));
+}
+
 export function nearestEffortIndex(frame: number, efforts: readonly EffortLike[]): number {
   if (efforts.length === 0) return -1;
   const safe = clampFrame(frame);
@@ -110,11 +132,16 @@ export function liangRankForFrame(rawFrame: number): string {
   return LIANG_RANKS[Math.min(LIANG_RANKS.length - 1, Math.max(0, index))];
 }
 
-export function indicatorLabel(rawFrame: number, efforts: readonly EffortLike[]): string {
+export function indicatorLabel(
+  rawFrame: number,
+  efforts: readonly EffortLike[],
+  options: { withLevel?: boolean } = {},
+): string {
+  const rank = options.withLevel === true
+    ? `${liangRankForFrame(rawFrame)} ${levelForFrame(rawFrame)}`
+    : liangRankForFrame(rawFrame);
   const effort = efforts[nearestEffortIndex(rawFrame, efforts)];
-  return effort === undefined
-    ? liangRankForFrame(rawFrame)
-    : `${liangRankForFrame(rawFrame)} · ${effort.name}`;
+  return effort === undefined ? rank : `${rank} · ${effort.name}`;
 }
 
 function lerp(a: number, b: number, amount: number): number {

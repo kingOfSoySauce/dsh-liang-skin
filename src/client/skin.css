@@ -381,6 +381,13 @@ body[data-liang-skin="on"] .liang-effort-control {
   transform: translate(-50%, -50%);
 }
 
+/* Fine stops (0–30). Short and faint so the effort anchors still read as the
+   model's real levels, while the rail shows every usable position. */
+.liang-effort-control__tick--minor {
+  height: 3px;
+  opacity: 0.2;
+}
+
 .liang-effort-control__range {
   position: relative;
   z-index: 1;

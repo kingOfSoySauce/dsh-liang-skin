@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  FINE_STEPS,
   frameForEffort,
+  frameForLevel,
   indicatorLabel,
+  levelForFrame,
   liangRankForFrame,
   nearestEffortIndex,
   paletteForFrame,
   portraitBlendForLevel,
   selectedEffortIndex,
+  snapFrame,
 } from "./logic";
 
 const efforts = [
@@ -63,5 +67,31 @@ describe("滑动变祖 effort mapping", () => {
     expect(liangRankForFrame(240)).toBe("梁祖");
     expect(indicatorLabel(240, efforts)).toBe("梁祖 · Max");
     expect(indicatorLabel(119, efforts)).toBe("梁子 · High");
+  });
+
+  it("snaps the thumb onto the fine grid instead of the effort anchor", () => {
+    expect(FINE_STEPS).toBe(30);
+    expect([0, 15, 30].map(frameForLevel)).toEqual([0, 120, 240]);
+    expect(levelForFrame(240)).toBe(30);
+    expect(levelForFrame(0)).toBe(0);
+    // 117 is inside the High band but lands on the level-15 stop, not frame 120.
+    expect(snapFrame(117)).toBe(120);
+    // 57 → level 7 → frame 56: no longer collapses onto 0 or 120.
+    expect(snapFrame(57)).toBe(56);
+    // 161 → level 20 → frame 160.
+    expect(snapFrame(161)).toBe(160);
+    expect(snapFrame(-4)).toBe(0);
+    expect(snapFrame(999)).toBe(240);
+  });
+
+  it("shows the fine level next to the submitted effort name", () => {
+    expect(indicatorLabel(137, efforts, { withLevel: true })).toBe("梁子 17 · High");
+    expect(indicatorLabel(240, efforts, { withLevel: true })).toBe("梁祖 30 · Max");
+    // The submitted id still follows the nearest effort anchor: with three
+    // efforts the band edges sit at 60/180, so fine stops 1–7 submit Off and
+    // stops 8–22 submit High even though the skin keeps their exact level.
+    expect(nearestEffortIndex(snapFrame(57), efforts)).toBe(0);
+    expect(nearestEffortIndex(snapFrame(97), efforts)).toBe(1);
+    expect(nearestEffortIndex(snapFrame(200), efforts)).toBe(2);
   });
 });

@@ -42,15 +42,6 @@ body[data-liang-skin="on"] .liang-skin-backdrop {
   display: none;
 }
 
-.liang-skin-backdrop::after {
-  position: absolute;
-  inset: 0;
-  content: "";
-  background:
-    linear-gradient(90deg, var(--liang-page, transparent) 0 28%, transparent 57% 100%),
-    linear-gradient(var(--liang-bg-base, transparent), var(--liang-bg-base, transparent));
-}
-
 body[data-liang-skin="on"] {
   /* Keep the backdrop above the canvas but below content and native portals.
      The host owns root positioning, dimensions, and its own stacking order. */

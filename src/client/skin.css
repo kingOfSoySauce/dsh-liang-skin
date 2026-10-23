@@ -611,7 +611,7 @@ body[data-liang-skin="on"] .liang-effort-control__range::-webkit-slider-thumb {
 }
 
 .liang-skin-backdrop[data-engaged="true"] .liang-skin-portrait-stack {
-  opacity: var(--liang-portrait-opacity, 0.82);
+  opacity: 1;
   transform: scale(1);
 }
 

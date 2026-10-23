@@ -107,17 +107,22 @@ body[data-liang-skin="on"] .liang-skin-backdrop {
   filter: none;
   /* Edge fade values are state variables: idle has a 30% left fade, running
      adds the other three 12% edges, the slider uses 12% on all four. */
+  /* The middle must stay fully opaque: these masks only feather the edges.
+     Keeping h30/h88 below 1 darkened the whole portrait. */
   --liang-image-h: linear-gradient(90deg,
     rgb(0 0 0 / 0) 0%,
     rgb(0 0 0 / var(--liang-h12)) 12%,
     rgb(0 0 0 / var(--liang-h20)) 20%,
-    rgb(0 0 0 / var(--liang-h30)) 30%,
-    rgb(0 0 0 / var(--liang-h88)) 88%,
+    rgb(0 0 0 / 1) 32%,
+    rgb(0 0 0 / 1) 86%,
+    rgb(0 0 0 / var(--liang-h88)) 94%,
     rgb(0 0 0 / var(--liang-h100)) 100%);
   --liang-image-v: linear-gradient(180deg,
     rgb(0 0 0 / var(--liang-v0)) 0%,
     rgb(0 0 0 / var(--liang-v12)) 12%,
-    rgb(0 0 0 / var(--liang-v88)) 88%,
+    rgb(0 0 0 / 1) 26%,
+    rgb(0 0 0 / 1) 84%,
+    rgb(0 0 0 / var(--liang-v88)) 92%,
     rgb(0 0 0 / var(--liang-v100)) 100%);
   /* Four elliptical corner masks. The cut is a percentage of the image's
      width/height (30/20/10); the feather is a percentage of the ellipse and

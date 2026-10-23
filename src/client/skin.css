@@ -10,29 +10,15 @@
   initial-value: 26.7%;
 }
 
-@property --liang-edge-left-12 {
-  syntax: "<number>";
-  inherits: true;
-  initial-value: 0.2;
-}
-
-@property --liang-edge-left-20 {
-  syntax: "<number>";
-  inherits: true;
-  initial-value: 0.5;
-}
-
-@property --liang-edge-right-100 {
-  syntax: "<number>";
-  inherits: true;
-  initial-value: 1;
-}
-
-@property --liang-edge-v {
-  syntax: "<number>";
-  inherits: true;
-  initial-value: 1;
-}
+@property --liang-h12 { syntax: "<number>"; inherits: true; initial-value: 0.1; }
+@property --liang-h20 { syntax: "<number>"; inherits: true; initial-value: 0.2; }
+@property --liang-h30 { syntax: "<number>"; inherits: true; initial-value: 0.3; }
+@property --liang-h88 { syntax: "<number>"; inherits: true; initial-value: 0.3; }
+@property --liang-h100 { syntax: "<number>"; inherits: true; initial-value: 0.3; }
+@property --liang-v0 { syntax: "<number>"; inherits: true; initial-value: 0.1; }
+@property --liang-v12 { syntax: "<number>"; inherits: true; initial-value: 0.3; }
+@property --liang-v88 { syntax: "<number>"; inherits: true; initial-value: 0.3; }
+@property --liang-v100 { syntax: "<number>"; inherits: true; initial-value: 0.1; }
 
 .liang-skin-backdrop {
   position: fixed;
@@ -43,20 +29,30 @@
   background: var(--liang-page, transparent);
   --liang-corner-cut: 30%;
   --liang-corner-feather: 26.7%;
-  --liang-edge-left-12: 0.2;
-  --liang-edge-left-20: 0.5;
-  --liang-edge-right-100: 1;
-  --liang-edge-v: 1;
+  --liang-h12: 0.1;
+  --liang-h20: 0.2;
+  --liang-h30: 0.3;
+  --liang-h88: 0.3;
+  --liang-h100: 0.3;
+  --liang-v0: 0.1;
+  --liang-v12: 0.3;
+  --liang-v88: 0.3;
+  --liang-v100: 0.1;
   opacity: 0;
   transition:
     opacity 220ms ease,
     background-color 180ms linear,
     --liang-corner-cut 1400ms ease,
     --liang-corner-feather 1400ms ease,
-    --liang-edge-left-12 1400ms ease,
-    --liang-edge-left-20 1400ms ease,
-    --liang-edge-right-100 1400ms ease,
-    --liang-edge-v 1400ms ease;
+    --liang-h12 1400ms ease,
+    --liang-h20 1400ms ease,
+    --liang-h30 1400ms ease,
+    --liang-h88 1400ms ease,
+    --liang-h100 1400ms ease,
+    --liang-v0 1400ms ease,
+    --liang-v12 1400ms ease,
+    --liang-v88 1400ms ease,
+    --liang-v100 1400ms ease;
 }
 
 body[data-liang-skin="on"] .liang-skin-backdrop {
@@ -66,28 +62,35 @@ body[data-liang-skin="on"] .liang-skin-backdrop {
 .liang-skin-backdrop[data-engaged="true"] {
   --liang-corner-cut: 20%;
   --liang-corner-feather: 40%;
-  --liang-edge-left-12: 0.7;
-  --liang-edge-left-20: 1;
-  --liang-edge-right-100: 0;
-  --liang-edge-v: 0;
+  --liang-h12: 0.2;
+  --liang-h20: 0.3;
+  --liang-h30: 0.5;
+  --liang-h88: 0.5;
+  --liang-h100: 0.5;
 }
 
 .liang-skin-backdrop[data-preview="true"] {
   --liang-corner-cut: 10%;
   --liang-corner-feather: 40%;
-  --liang-edge-left-12: 1;
-  --liang-edge-left-20: 1;
-  --liang-edge-right-100: 0;
-  --liang-edge-v: 0;
+  --liang-h12: 1;
+  --liang-h20: 1;
+  --liang-h30: 1;
+  --liang-h88: 1;
+  --liang-h100: 0;
   transition:
     opacity 220ms ease,
     background-color 180ms linear,
     --liang-corner-cut 260ms ease,
     --liang-corner-feather 260ms ease,
-    --liang-edge-left-12 260ms ease,
-    --liang-edge-left-20 260ms ease,
-    --liang-edge-right-100 260ms ease,
-    --liang-edge-v 260ms ease;
+    --liang-h12 260ms ease,
+    --liang-h20 260ms ease,
+    --liang-h30 260ms ease,
+    --liang-h88 260ms ease,
+    --liang-h100 260ms ease,
+    --liang-v0 260ms ease,
+    --liang-v12 260ms ease,
+    --liang-v88 260ms ease,
+    --liang-v100 260ms ease;
 }
 
 .liang-skin-backdrop img {
@@ -106,16 +109,16 @@ body[data-liang-skin="on"] .liang-skin-backdrop {
      adds the other three 12% edges, the slider uses 12% on all four. */
   --liang-image-h: linear-gradient(90deg,
     rgb(0 0 0 / 0) 0%,
-    rgb(0 0 0 / var(--liang-edge-left-12)) 12%,
-    rgb(0 0 0 / var(--liang-edge-left-20)) 20%,
-    rgb(0 0 0 / 1) 30%,
-    rgb(0 0 0 / 1) 88%,
-    rgb(0 0 0 / var(--liang-edge-right-100)) 100%);
+    rgb(0 0 0 / var(--liang-h12)) 12%,
+    rgb(0 0 0 / var(--liang-h20)) 20%,
+    rgb(0 0 0 / var(--liang-h30)) 30%,
+    rgb(0 0 0 / var(--liang-h88)) 88%,
+    rgb(0 0 0 / var(--liang-h100)) 100%);
   --liang-image-v: linear-gradient(180deg,
-    rgb(0 0 0 / var(--liang-edge-v)) 0%,
-    rgb(0 0 0 / 1) 12%,
-    rgb(0 0 0 / 1) 88%,
-    rgb(0 0 0 / var(--liang-edge-v)) 100%);
+    rgb(0 0 0 / var(--liang-v0)) 0%,
+    rgb(0 0 0 / var(--liang-v12)) 12%,
+    rgb(0 0 0 / var(--liang-v88)) 88%,
+    rgb(0 0 0 / var(--liang-v100)) 100%);
   /* Four elliptical corner masks. The cut is a percentage of the image's
      width/height (30/20/10); the feather is a percentage of the ellipse and
      maps back to the 8/8/4 image-percent blur in each state. */
@@ -711,11 +714,11 @@ body[data-liang-skin="on"] .liang-effort-control__range::-webkit-slider-thumb {
   transition: opacity 1400ms ease, transform 1800ms ease;
   /* Gaussian falloff (sigma ~0.37) sampled into gradient stops. The veil is
      constant across all three states; the stack opacity below sets the
-     centre strength (76% idle, 85% running, 100% slider preview). */
+     centre strength (30% idle, 70% running, 100% slider preview). */
   /* Centre the Gaussian on the portrait itself, not on the viewport: the
      image is right-aligned with width min(42vw, 720px), so its centre is at
      100% - min(21vw, 360px), 50%. The centre alpha is always 1; the stack
-     opacity (76/85/100%) sets the actual centre strength. */
+     opacity (30/70/100%) sets the actual centre strength. */
   --liang-veil: radial-gradient(ellipse 40% 56% at calc(100% - min(21vw, 360px)) 50%,
     rgb(0 0 0 / 1) 0%,
     rgb(0 0 0 / 1) 62%,
@@ -729,14 +732,14 @@ body[data-liang-skin="on"] .liang-effort-control__range::-webkit-slider-thumb {
 }
 
 .liang-skin-backdrop[data-engaged="true"] .liang-skin-portrait-stack {
-  opacity: 0.85;
+  opacity: 0.7;
   transform: scale(1);
 }
 
 /* Idle: the mask keeps the centre readable as a ghost (~42%) while the rim
    fades to ~2%, so the silhouette dissolves into the void. */
 .liang-skin-backdrop[data-engaged="false"] .liang-skin-portrait-stack {
-  opacity: 0.76;
+  opacity: 0.3;
   transform: scale(1.035);
 }
 

@@ -40,16 +40,24 @@ export interface TuneValues {
   };
 }
 
-const BASE_VEIL: Veil = { plateau: 31, a50: 0.24, a85: 0.11, edge: 0, ew: 46, eh: 80, cx: 78, cy: 36 };
-const BASE_MASK: Mask = { edgeX: 0, edgeY: 0, featherX: 14, featherY: 10 };
-
 export const TUNE_DEFAULTS: TuneValues = {
-  idle: { opacity: 0.22, scale: 1.035, cut: 30, feather: 46, scrim: 0.5, veil: { ...BASE_VEIL }, mask: { ...BASE_MASK } },
-  running: { opacity: 0.67, scale: 1, cut: 20, feather: 46, scrim: 0.5, veil: { ...BASE_VEIL }, mask: { ...BASE_MASK } },
-  preview: { opacity: 1, scale: 1, cut: 10, feather: 46, scrim: 0.5, veil: { ...BASE_VEIL }, mask: { ...BASE_MASK } },
-  image: { objectY: 36, width: 42 },
+  idle: {
+    opacity: 0.32, scale: 0.9, cut: 30, feather: 46, scrim: 3.5,
+    veil: { plateau: 31, a50: 0.21, a85: 0.08, edge: 0, ew: 46, eh: 80, cx: 78, cy: 36 },
+    mask: { edgeX: 0, edgeY: 0, featherX: 50, featherY: 50 },
+  },
+  running: {
+    opacity: 0.69, scale: 1, cut: 20, feather: 46, scrim: 0.7,
+    veil: { plateau: 28, a50: 0.14, a85: 0.06, edge: 0, ew: 46, eh: 80, cx: 78, cy: 36 },
+    mask: { edgeX: 0, edgeY: 0, featherX: 21, featherY: 7 },
+  },
+  preview: {
+    opacity: 1, scale: 1, cut: 10, feather: 46, scrim: 0,
+    veil: { plateau: 56, a50: 0.38, a85: 0.11, edge: 0, ew: 46, eh: 80, cx: 78, cy: 36 },
+    mask: { edgeX: 0, edgeY: 0, featherX: 14, featherY: 10 },
+  },
+  image: { objectY: 33, width: 42 },
 };
-
 const KEY = "dsh-liang-tune.v9";
 const DEFAULTS_KEY = "dsh-liang-tune.defaults";
 const POS_KEY = "dsh-liang-tune.pos";

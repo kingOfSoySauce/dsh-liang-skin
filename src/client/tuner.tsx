@@ -105,8 +105,6 @@ export function applyTune(values: TuneValues) {
     stack.style.setProperty("--liang-veil", veilGradient);
     stack.style.webkitMaskImage = veilGradient;
     stack.style.maskImage = veilGradient;
-    stack.style.setProperty("--liang-corner-cut", `${current.cut}%`);
-    stack.style.setProperty("--liang-corner-feather", `${current.feather}%`);
     stack.style.opacity = String(current.opacity);
     stack.style.transform = `scale(${current.scale})`;
     const mask = values.mask;
@@ -214,8 +212,6 @@ export function LiangTuner({ onForce, liveState }: TunerProps) {
   const rows = useMemo(() => ([
     { key: "opacity", label: "透明度", min: 0, max: 1, step: 0.01, value: state.opacity, patch: (v: number) => setState({ opacity: v }) },
     { key: "scale", label: "缩放", min: 0.9, max: 1.1, step: 0.005, value: state.scale, patch: (v: number) => setState({ scale: v }) },
-    { key: "cut", label: "圆角 %", min: 0, max: 50, step: 1, value: state.cut, patch: (v: number) => setState({ cut: v }) },
-    { key: "feather", label: "羽化 %", min: 0, max: 100, step: 1, value: state.feather, patch: (v: number) => setState({ feather: v }) },
   ]), [state, tab]);
 
   return (

@@ -143,8 +143,8 @@ body[data-liang-skin="on"] .liang-skin-backdrop {
     rgb(0 0 0 / 0) 0%,
     rgb(0 0 0 / 0) calc(100% - var(--liang-corner-feather)),
     rgb(0 0 0 / 1) 100%);
-  -webkit-mask-image: var(--liang-image-h), var(--liang-image-v), var(--liang-corner-tl), var(--liang-corner-tr), var(--liang-corner-bl), var(--liang-corner-br);
-  mask-image: var(--liang-image-h), var(--liang-image-v), var(--liang-corner-tl), var(--liang-corner-tr), var(--liang-corner-bl), var(--liang-corner-br);
+  -webkit-mask-image: var(--liang-image-h), var(--liang-image-v);
+  mask-image: var(--liang-image-h), var(--liang-image-v);
   -webkit-mask-composite: source-in;
   mask-composite: intersect;
   transition: filter 180ms linear;

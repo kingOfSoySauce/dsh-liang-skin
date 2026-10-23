@@ -2,53 +2,55 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 export type TuneStateId = "idle" | "running" | "preview";
 
+export interface Veil {
+  plateau: number;
+  a50: number;
+  a85: number;
+  edge: number;
+  ew: number;
+  eh: number;
+  cx: number;
+  cy: number;
+}
+
+export interface Mask {
+  edgeX: number;
+  edgeY: number;
+  featherX: number;
+  featherY: number;
+}
+
 export interface TuneState {
   opacity: number;
   scale: number;
   cut: number;
   feather: number;
   scrim: number;
+  veil: Veil;
+  mask: Mask;
 }
 
 export interface TuneValues {
   idle: TuneState;
   running: TuneState;
   preview: TuneState;
-  veil: {
-    plateau: number;
-    a50: number;
-    a85: number;
-    edge: number;
-    ew: number;
-    eh: number;
-    cx: number;
-    cy: number;
-  };
   image: {
     objectY: number;
     width: number;
-    brightness: number;
-    contrast: number;
-    scrim: number;
-  };
-  mask: {
-    edgeX: number;
-    edgeY: number;
-    featherX: number;
-    featherY: number;
   };
 }
 
+const BASE_VEIL: Veil = { plateau: 31, a50: 0.24, a85: 0.11, edge: 0, ew: 46, eh: 80, cx: 78, cy: 36 };
+const BASE_MASK: Mask = { edgeX: 0, edgeY: 0, featherX: 14, featherY: 10 };
+
 export const TUNE_DEFAULTS: TuneValues = {
-  idle: { opacity: 0.22, scale: 1.035, cut: 30, feather: 46, scrim: 0.5 },
-  running: { opacity: 0.67, scale: 1, cut: 20, feather: 46, scrim: 0.5 },
-  preview: { opacity: 1, scale: 1, cut: 10, feather: 46, scrim: 0.5 },
-  veil: { plateau: 31, a50: 0.24, a85: 0.11, edge: 0, ew: 46, eh: 80, cx: 78, cy: 36 },
-  image: { objectY: 36, width: 42, brightness: 1, contrast: 1, scrim: 0.5 },
-  mask: { edgeX: 0, edgeY: 0, featherX: 14, featherY: 10 },
+  idle: { opacity: 0.22, scale: 1.035, cut: 30, feather: 46, scrim: 0.5, veil: { ...BASE_VEIL }, mask: { ...BASE_MASK } },
+  running: { opacity: 0.67, scale: 1, cut: 20, feather: 46, scrim: 0.5, veil: { ...BASE_VEIL }, mask: { ...BASE_MASK } },
+  preview: { opacity: 1, scale: 1, cut: 10, feather: 46, scrim: 0.5, veil: { ...BASE_VEIL }, mask: { ...BASE_MASK } },
+  image: { objectY: 36, width: 42 },
 };
 
-const KEY = "dsh-liang-tune.v8";
+const KEY = "dsh-liang-tune.v9";
 const DEFAULTS_KEY = "dsh-liang-tune.defaults";
 const POS_KEY = "dsh-liang-tune.pos";
 
@@ -71,19 +73,8 @@ export function applyTune(values: TuneValues) {
     style.setProperty(`--liang-tune-${id}-cut`, `${state.cut}%`);
     style.setProperty(`--liang-tune-${id}-feather`, `${state.feather}%`);
   }
-  const veil = values.veil;
-  style.setProperty("--liang-tune-plateau", `${veil.plateau}%`);
-  style.setProperty("--liang-tune-a50", String(veil.a50));
-  style.setProperty("--liang-tune-a85", String(veil.a85));
-  style.setProperty("--liang-tune-edge", String(veil.edge));
-  style.setProperty("--liang-tune-ew", `${veil.ew}%`);
-  style.setProperty("--liang-tune-eh", `${veil.eh}%`);
-  style.setProperty("--liang-tune-cx", `${veil.cx}%`);
-  style.setProperty("--liang-tune-cy", `${veil.cy}%`);
   style.setProperty("--liang-tune-object-y", `${values.image.objectY}%`);
   style.setProperty("--liang-tune-width", `${values.image.width}vw`);
-  style.setProperty("--liang-tune-brightness", String(values.image.brightness));
-  style.setProperty("--liang-tune-contrast", String(values.image.contrast));
 
   // Inline styles win over any stale stylesheet that a hot reload left behind.
   const root = document.querySelector(".liang-skin-backdrop");
@@ -94,6 +85,8 @@ export function applyTune(values: TuneValues) {
       ? "running"
       : "idle";
   const current = values[state];
+  const veil = current.veil;
+  const mask = current.mask;
   style.setProperty("--liang-tune-scrim", String(current.scrim));
   const veilCss = [
     `#000 0%`,
@@ -109,7 +102,6 @@ export function applyTune(values: TuneValues) {
     stack.style.maskImage = veilGradient;
     stack.style.opacity = String(current.opacity);
     stack.style.transform = `scale(${current.scale})`;
-    const mask = values.mask;
     const edgeX = `rgb(0 0 0 / ${mask.edgeX})`;
     const edgeY = `rgb(0 0 0 / ${mask.edgeY})`;
     const hMask = `linear-gradient(90deg, ${edgeX} 0%, rgb(0 0 0 / 1) ${mask.featherX}%, rgb(0 0 0 / 1) ${100 - mask.featherX}%, ${edgeX} 100%)`;
@@ -128,7 +120,13 @@ function loadDefaults(): TuneValues {
     const raw = localStorage.getItem(DEFAULTS_KEY);
     if (raw === null) return TUNE_DEFAULTS;
     const parsed = JSON.parse(raw) as TuneValues;
-    return { ...TUNE_DEFAULTS, ...parsed, veil: { ...TUNE_DEFAULTS.veil, ...parsed.veil }, image: { ...TUNE_DEFAULTS.image, ...parsed.image }, mask: { ...TUNE_DEFAULTS.mask, ...parsed.mask } };
+    const merge = (id: "idle" | "running" | "preview") => ({
+      ...TUNE_DEFAULTS[id],
+      ...parsed[id],
+      veil: { ...TUNE_DEFAULTS[id].veil, ...parsed[id]?.veil },
+      mask: { ...TUNE_DEFAULTS[id].mask, ...parsed[id]?.mask },
+    });
+    return { idle: merge("idle"), running: merge("running"), preview: merge("preview"), image: { ...TUNE_DEFAULTS.image, ...parsed.image } };
   } catch {
     return TUNE_DEFAULTS;
   }
@@ -204,14 +202,14 @@ export function LiangTuner({ onForce, liveState }: TunerProps) {
   const setState = (patch: Partial<TuneState>) => {
     setValues((current) => ({ ...current, [tab]: { ...current[tab], ...patch } }));
   };
-  const setVeil = (patch: Partial<TuneValues["veil"]>) => {
-    setValues((current) => ({ ...current, veil: { ...current.veil, ...patch } }));
+  const setVeil = (patch: Partial<Veil>) => {
+    setValues((current) => ({ ...current, [tab]: { ...current[tab], veil: { ...current[tab].veil, ...patch } } }));
   };
   const setImage = (patch: Partial<TuneValues["image"]>) => {
     setValues((current) => ({ ...current, image: { ...current.image, ...patch } }));
   };
-  const setMask = (patch: Partial<TuneValues["mask"]>) => {
-    setValues((current) => ({ ...current, mask: { ...current.mask, ...patch } }));
+  const setMask = (patch: Partial<Mask>) => {
+    setValues((current) => ({ ...current, [tab]: { ...current[tab], mask: { ...current[tab].mask, ...patch } } }));
   };
 
   const rows = useMemo(() => ([
@@ -307,14 +305,14 @@ export function LiangTuner({ onForce, liveState }: TunerProps) {
           <div className="liang-tuner__section">高斯蒙版（三态共用）</div>
           <div className="liang-tuner__rows">
             {([
-              ["平台 %", values.veil.plateau, 0, 90, 1, (v: number) => setVeil({ plateau: v })],
-              ["50% 处 α", values.veil.a50, 0, 1, 0.01, (v: number) => setVeil({ a50: v })],
-              ["85% 处 α", values.veil.a85, 0, 1, 0.01, (v: number) => setVeil({ a85: v })],
-              ["边缘 α", values.veil.edge, 0, 0.3, 0.005, (v: number) => setVeil({ edge: v })],
-              ["椭圆宽 %", values.veil.ew, 5, 70, 1, (v: number) => setVeil({ ew: v })],
-              ["椭圆高 %", values.veil.eh, 5, 90, 1, (v: number) => setVeil({ eh: v })],
-              ["中心 X %", values.veil.cx, 0, 100, 1, (v: number) => setVeil({ cx: v })],
-              ["中心 Y %（小=上）", values.veil.cy, 0, 100, 1, (v: number) => setVeil({ cy: v })],
+              ["平台 %", state.veil.plateau, 0, 90, 1, (v: number) => setVeil({ plateau: v })],
+              ["50% 处 α", state.veil.a50, 0, 1, 0.01, (v: number) => setVeil({ a50: v })],
+              ["85% 处 α", state.veil.a85, 0, 1, 0.01, (v: number) => setVeil({ a85: v })],
+              ["边缘 α", state.veil.edge, 0, 0.3, 0.005, (v: number) => setVeil({ edge: v })],
+              ["椭圆宽 %", state.veil.ew, 5, 70, 1, (v: number) => setVeil({ ew: v })],
+              ["椭圆高 %", state.veil.eh, 5, 90, 1, (v: number) => setVeil({ eh: v })],
+              ["中心 X %", state.veil.cx, 0, 100, 1, (v: number) => setVeil({ cx: v })],
+              ["中心 Y %（小=上）", state.veil.cy, 0, 100, 1, (v: number) => setVeil({ cy: v })],
             ] as const).map(([label, value, min, max, step, patch]) => (
               <label key={label} className="liang-tuner__row">
                 <span>{label}</span>
@@ -333,10 +331,10 @@ export function LiangTuner({ onForce, liveState }: TunerProps) {
           <div className="liang-tuner__section">边缘羽化（人物图自身蒙版）</div>
           <div className="liang-tuner__rows">
             {([
-              ["左右羽化 %", values.mask.featherX, 0, 50, 1, (v: number) => setMask({ featherX: v })],
-              ["上下羽化 %", values.mask.featherY, 0, 50, 1, (v: number) => setMask({ featherY: v })],
-              ["左右边缘 α", values.mask.edgeX, 0, 1, 0.01, (v: number) => setMask({ edgeX: v })],
-              ["上下边缘 α", values.mask.edgeY, 0, 1, 0.01, (v: number) => setMask({ edgeY: v })],
+              ["左右羽化 %", state.mask.featherX, 0, 50, 1, (v: number) => setMask({ featherX: v })],
+              ["上下羽化 %", state.mask.featherY, 0, 50, 1, (v: number) => setMask({ featherY: v })],
+              ["左右边缘 α", state.mask.edgeX, 0, 1, 0.01, (v: number) => setMask({ edgeX: v })],
+              ["上下边缘 α", state.mask.edgeY, 0, 1, 0.01, (v: number) => setMask({ edgeY: v })],
             ] as const).map(([label, value, min, max, step, patch]) => (
               <label key={label} className="liang-tuner__row">
                 <span>{label}</span>

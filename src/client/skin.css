@@ -169,8 +169,8 @@ body[data-liang-skin="on"] .liang-skin-backdrop {
   content: "";
   background: #000;
   pointer-events: none;
-  /* Everything above 1 adds a pure black layer on top of the normal scrim. */
-  opacity: max(0, calc(var(--liang-tune-scrim, 1) - 1));
+  /* 1 is the normal scrim; 2-10 ramp a pure black layer up to fully opaque. */
+  opacity: min(1, max(0, calc((var(--liang-tune-scrim, 1) - 1) / 9)));
 }
 
 .liang-skin-backdrop::after {

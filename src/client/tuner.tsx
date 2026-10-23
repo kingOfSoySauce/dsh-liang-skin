@@ -359,7 +359,7 @@ export function LiangTuner({ onForce, liveState }: TunerProps) {
             {([
               ["垂直位置 %", values.image.objectY, 0, 100, 1, (v: number) => setImage({ objectY: v })],
               ["宽度 vw", values.image.width, 20, 70, 1, (v: number) => setImage({ width: v })],
-              ["背景压暗 0-3", values.image.scrim, 0, 3, 0.05, (v: number) => setImage({ scrim: v })],
+              ["背景压暗 0-10", values.image.scrim, 0, 10, 0.1, (v: number) => setImage({ scrim: v })],
             ] as const).map(([label, value, min, max, step, patch]) => (
               <label key={label} className="liang-tuner__row">
                 <span>{label}</span>

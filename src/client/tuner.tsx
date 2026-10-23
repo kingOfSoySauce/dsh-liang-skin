@@ -30,6 +30,12 @@ export interface TuneValues {
     contrast: number;
     scrim: number;
   };
+  mask: {
+    edgeX: number;
+    edgeY: number;
+    featherX: number;
+    featherY: number;
+  };
 }
 
 export const TUNE_DEFAULTS: TuneValues = {
@@ -38,6 +44,7 @@ export const TUNE_DEFAULTS: TuneValues = {
   preview: { opacity: 1, scale: 1, cut: 10, feather: 40 },
   veil: { plateau: 72, a90: 0.9, a96: 0.7, edge: 0.12, ew: 46, eh: 80, cx: 75, cy: 36 },
   image: { objectY: 36, width: 42, brightness: 1.2, contrast: 1.05, scrim: 0.3 },
+  mask: { edgeX: 0, edgeY: 0, featherX: 32, featherY: 26 },
 };
 
 const KEY = "dsh-liang-tune.v5";
@@ -86,9 +93,16 @@ export function applyTune(values: TuneValues) {
     stack.style.opacity = String(current.opacity);
     stack.style.transform = `scale(${current.scale})`;
     stack.style.filter = `brightness(${values.image.brightness}) contrast(${values.image.contrast})`;
+    const mask = values.mask;
+    const edgeX = `rgb(0 0 0 / ${mask.edgeX})`;
+    const edgeY = `rgb(0 0 0 / ${mask.edgeY})`;
+    const hMask = `linear-gradient(90deg, ${edgeX} 0%, rgb(0 0 0 / 1) ${mask.featherX}%, rgb(0 0 0 / 1) ${100 - mask.featherX}%, ${edgeX} 100%)`;
+    const vMask = `linear-gradient(180deg, ${edgeY} 0%, rgb(0 0 0 / 1) ${mask.featherY}%, rgb(0 0 0 / 1) ${100 - mask.featherY}%, ${edgeY} 100%)`;
     for (const frame of Array.from(stack.querySelectorAll<HTMLElement>("img.liang-skin-frame"))) {
       frame.style.objectPosition = `50% ${values.image.objectY}%`;
       frame.style.width = `min(${values.image.width}vw, 720px)`;
+      frame.style.setProperty("--liang-image-h", hMask);
+      frame.style.setProperty("--liang-image-v", vMask);
     }
   }
 }
@@ -103,6 +117,7 @@ function loadTune(): TuneValues {
       ...parsed,
       veil: { ...TUNE_DEFAULTS.veil, ...parsed.veil },
       image: { ...TUNE_DEFAULTS.image, ...parsed.image },
+      mask: { ...TUNE_DEFAULTS.mask, ...parsed.mask },
     };
   } catch {
     return TUNE_DEFAULTS;
@@ -162,6 +177,9 @@ export function LiangTuner({ onForce, liveState }: TunerProps) {
   };
   const setImage = (patch: Partial<TuneValues["image"]>) => {
     setValues((current) => ({ ...current, image: { ...current.image, ...patch } }));
+  };
+  const setMask = (patch: Partial<TuneValues["mask"]>) => {
+    setValues((current) => ({ ...current, mask: { ...current.mask, ...patch } }));
   };
 
   const rows = useMemo(() => ([
@@ -255,6 +273,28 @@ export function LiangTuner({ onForce, liveState }: TunerProps) {
                   onChange={(event) => patch(Number(event.target.value))}
                 />
                 <output>{Number(value).toFixed(step < 0.01 ? 3 : (step < 1 ? 2 : 0))}</output>
+              </label>
+            ))}
+          </div>
+          <div className="liang-tuner__section">边缘羽化（人物图自身蒙版）</div>
+          <div className="liang-tuner__rows">
+            {([
+              ["左右羽化 %", values.mask.featherX, 0, 50, 1, (v: number) => setMask({ featherX: v })],
+              ["上下羽化 %", values.mask.featherY, 0, 50, 1, (v: number) => setMask({ featherY: v })],
+              ["左右边缘 α", values.mask.edgeX, 0, 1, 0.01, (v: number) => setMask({ edgeX: v })],
+              ["上下边缘 α", values.mask.edgeY, 0, 1, 0.01, (v: number) => setMask({ edgeY: v })],
+            ] as const).map(([label, value, min, max, step, patch]) => (
+              <label key={label} className="liang-tuner__row">
+                <span>{label}</span>
+                <input
+                  type="range"
+                  min={min}
+                  max={max}
+                  step={step}
+                  value={value}
+                  onChange={(event) => patch(Number(event.target.value))}
+                />
+                <output>{Number(value).toFixed(step < 1 ? 2 : 0)}</output>
               </label>
             ))}
           </div>

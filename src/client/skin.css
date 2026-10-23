@@ -913,16 +913,3 @@ body[data-liang-skin="on"] .liang-effort-control__range::-webkit-slider-thumb {
   color: inherit;
   cursor: pointer;
 }
-
-.liang-tuner__link {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 2px 0 8px;
-  color: rgb(255 255 255 / 70%);
-  font-size: 11px;
-}
-
-.liang-tuner__link input {
-  accent-color: var(--liang-accent, #d6a34e);
-}

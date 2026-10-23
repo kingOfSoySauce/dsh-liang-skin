@@ -165,7 +165,6 @@ interface TunerProps {
 export function LiangTuner({ onForce, liveState }: TunerProps) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<TuneStateId>("idle");
-  const [link, setLink] = useState(true);
   const [values, setValues] = useState<TuneValues>(loadTune);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(loadPos);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -203,14 +202,7 @@ export function LiangTuner({ onForce, liveState }: TunerProps) {
 
   const state = values[tab];
   const setState = (patch: Partial<TuneState>) => {
-    setValues((current) => {
-      if (!link) return { ...current, [tab]: { ...current[tab], ...patch } };
-      const next = { ...current };
-      for (const id of ["idle", "running", "preview"] as const) {
-        next[id] = { ...next[id], ...patch };
-      }
-      return next;
-    });
+    setValues((current) => ({ ...current, [tab]: { ...current[tab], ...patch } }));
   };
   const setVeil = (patch: Partial<TuneValues["veil"]>) => {
     setValues((current) => ({ ...current, veil: { ...current.veil, ...patch } }));
@@ -281,10 +273,6 @@ export function LiangTuner({ onForce, liveState }: TunerProps) {
             <strong>背景人像参数</strong>
             <button type="button" onClick={() => setOpen(false)} aria-label="关闭">×</button>
           </div>
-          <label className="liang-tuner__link">
-            <input type="checkbox" checked={link} onChange={(event) => setLink(event.target.checked)} />
-            联动三态（改一个，三个一起变）
-          </label>
           <div className="liang-tuner__tabs">
             {(["idle", "running", "preview"] as const).map((id) => (
               <button

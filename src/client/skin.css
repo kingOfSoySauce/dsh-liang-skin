@@ -646,7 +646,11 @@ body[data-liang-skin="on"] .liang-effort-control__range::-webkit-slider-thumb {
   /* Gaussian falloff (sigma ~0.37) sampled into gradient stops. The veil is
      constant across all three states; the stack opacity below sets the
      centre strength (87% idle, 93% running, 100% slider preview). */
-  --liang-veil: radial-gradient(ellipse 62% 58% at 50% 40%,
+  /* Centre the Gaussian on the portrait itself, not on the viewport: the
+     image is right-aligned with width min(42vw, 720px), so its centre is at
+     100% - min(21vw, 360px), 50%. The centre alpha is always 1; the stack
+     opacity (87/93/100%) sets the actual centre strength. */
+  --liang-veil: radial-gradient(ellipse 40% 56% at calc(100% - min(21vw, 360px)) 50%,
     rgb(0 0 0 / 1) 0%,
     rgb(0 0 0 / 0.92) 15%,
     rgb(0 0 0 / 0.72) 30%,

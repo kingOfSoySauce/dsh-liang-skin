@@ -7,6 +7,7 @@ export interface TuneState {
   scale: number;
   cut: number;
   feather: number;
+  scrim: number;
 }
 
 export interface TuneValues {
@@ -39,15 +40,16 @@ export interface TuneValues {
 }
 
 export const TUNE_DEFAULTS: TuneValues = {
-  idle: { opacity: 0.45, scale: 1.035, cut: 30, feather: 26.7 },
-  running: { opacity: 0.85, scale: 1, cut: 20, feather: 40 },
-  preview: { opacity: 1, scale: 1, cut: 10, feather: 40 },
-  veil: { plateau: 40, a50: 0.85, a85: 0.45, edge: 0.1, ew: 46, eh: 80, cx: 75, cy: 36 },
-  image: { objectY: 36, width: 42, brightness: 1, contrast: 1, scrim: 0.3 },
-  mask: { edgeX: 0, edgeY: 0, featherX: 32, featherY: 26 },
+  idle: { opacity: 0.22, scale: 1.035, cut: 30, feather: 46, scrim: 0.5 },
+  running: { opacity: 0.67, scale: 1, cut: 20, feather: 46, scrim: 0.5 },
+  preview: { opacity: 1, scale: 1, cut: 10, feather: 46, scrim: 0.5 },
+  veil: { plateau: 31, a50: 0.24, a85: 0.11, edge: 0, ew: 46, eh: 80, cx: 78, cy: 36 },
+  image: { objectY: 36, width: 42, brightness: 1, contrast: 1, scrim: 0.5 },
+  mask: { edgeX: 0, edgeY: 0, featherX: 14, featherY: 10 },
 };
 
-const KEY = "dsh-liang-tune.v7";
+const KEY = "dsh-liang-tune.v8";
+const DEFAULTS_KEY = "dsh-liang-tune.defaults";
 const POS_KEY = "dsh-liang-tune.pos";
 
 function loadPos(): { x: number; y: number } | null {
@@ -82,7 +84,6 @@ export function applyTune(values: TuneValues) {
   style.setProperty("--liang-tune-width", `${values.image.width}vw`);
   style.setProperty("--liang-tune-brightness", String(values.image.brightness));
   style.setProperty("--liang-tune-contrast", String(values.image.contrast));
-  style.setProperty("--liang-tune-scrim", String(values.image.scrim));
 
   // Inline styles win over any stale stylesheet that a hot reload left behind.
   const root = document.querySelector(".liang-skin-backdrop");
@@ -93,6 +94,7 @@ export function applyTune(values: TuneValues) {
       ? "running"
       : "idle";
   const current = values[state];
+  style.setProperty("--liang-tune-scrim", String(current.scrim));
   const veilCss = [
     `#000 0%`,
     `#000 ${veil.plateau}%`,
@@ -121,10 +123,21 @@ export function applyTune(values: TuneValues) {
   }
 }
 
+function loadDefaults(): TuneValues {
+  try {
+    const raw = localStorage.getItem(DEFAULTS_KEY);
+    if (raw === null) return TUNE_DEFAULTS;
+    const parsed = JSON.parse(raw) as TuneValues;
+    return { ...TUNE_DEFAULTS, ...parsed, veil: { ...TUNE_DEFAULTS.veil, ...parsed.veil }, image: { ...TUNE_DEFAULTS.image, ...parsed.image }, mask: { ...TUNE_DEFAULTS.mask, ...parsed.mask } };
+  } catch {
+    return TUNE_DEFAULTS;
+  }
+}
+
 function loadTune(): TuneValues {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw === null) return TUNE_DEFAULTS;
+    if (raw === null) return loadDefaults();
     const parsed = JSON.parse(raw) as TuneValues;
     return {
       ...TUNE_DEFAULTS,
@@ -212,6 +225,7 @@ export function LiangTuner({ onForce, liveState }: TunerProps) {
   const rows = useMemo(() => ([
     { key: "opacity", label: "透明度", min: 0, max: 1, step: 0.01, value: state.opacity, patch: (v: number) => setState({ opacity: v }) },
     { key: "scale", label: "缩放", min: 0.9, max: 1.1, step: 0.005, value: state.scale, patch: (v: number) => setState({ scale: v }) },
+    { key: "scrim", label: "背景压暗 0-10", min: 0, max: 10, step: 0.1, value: state.scrim, patch: (v: number) => setValues((current) => ({ ...current, [tab]: { ...current[tab], scrim: v } })) },
   ]), [state, tab]);
 
   return (
@@ -355,7 +369,6 @@ export function LiangTuner({ onForce, liveState }: TunerProps) {
             {([
               ["垂直位置 %", values.image.objectY, 0, 100, 1, (v: number) => setImage({ objectY: v })],
               ["宽度 vw", values.image.width, 20, 70, 1, (v: number) => setImage({ width: v })],
-              ["背景压暗 0-10", values.image.scrim, 0, 10, 0.1, (v: number) => setImage({ scrim: v })],
             ] as const).map(([label, value, min, max, step, patch]) => (
               <label key={label} className="liang-tuner__row">
                 <span>{label}</span>
@@ -381,7 +394,19 @@ export function LiangTuner({ onForce, liveState }: TunerProps) {
             >
               复制参数
             </button>
-            <button type="button" onClick={() => setValues(TUNE_DEFAULTS)}>重置</button>
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  localStorage.setItem(DEFAULTS_KEY, JSON.stringify(values));
+                } catch {
+                  // Defaults are a convenience only.
+                }
+              }}
+            >
+              设为默认
+            </button>
+            <button type="button" onClick={() => setValues(loadDefaults())}>重置</button>
           </div>
         </div>
       )}

@@ -711,6 +711,7 @@ body[data-liang-skin="on"] .liang-effort-control__range::-webkit-slider-thumb {
 /* --- Engagement: the immortal surfaces while a turn runs, then withdraws --- */
 .liang-skin-portrait-stack {
   transform-origin: 50% 42%;
+  filter: brightness(var(--liang-tune-brightness, 1.15)) contrast(var(--liang-tune-contrast, 1.05));
   transition: opacity 1400ms ease, transform 1800ms ease;
   /* Gaussian falloff (sigma ~0.37) sampled into gradient stops. The veil is
      constant across all three states; the stack opacity below sets the

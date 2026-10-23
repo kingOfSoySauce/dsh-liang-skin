@@ -271,6 +271,13 @@ class SkinPresenter {
     this.root.dataset.engaged = engaged ? "true" : "false";
   }
 
+  /** Which portrait state is currently on screen. */
+  getTuneState(): "idle" | "running" | "preview" {
+    if (this.root.dataset.preview === "true") return "preview";
+    if (this.root.dataset.engaged === "true") return "running";
+    return "idle";
+  }
+
   /** While the user drags the slider the portrait shows at full strength. */
   setPreviewing(previewing: boolean) {
     if (this.disposed) return;
@@ -606,6 +613,7 @@ function LiangEffortSlider({ directory, load, select, presenter, scope, session 
         }}
       />
       {SHOW_TUNER && <LiangTuner
+        liveState={() => presenter.getTuneState()}
         onForce={(state: TuneStateId) => {
           if (state === "idle") {
             presenter.setPreviewing(false);

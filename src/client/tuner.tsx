@@ -90,11 +90,13 @@ const STATE_LABEL: Record<TuneStateId, string> = {
 
 interface TunerProps {
   onForce: (state: TuneStateId) => void;
+  liveState: () => TuneStateId;
 }
 
-export function LiangTuner({ onForce }: TunerProps) {
+export function LiangTuner({ onForce, liveState }: TunerProps) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<TuneStateId>("idle");
+  const [link, setLink] = useState(true);
   const [values, setValues] = useState<TuneValues>(loadTune);
 
   useEffect(() => {
@@ -108,7 +110,14 @@ export function LiangTuner({ onForce }: TunerProps) {
 
   const state = values[tab];
   const setState = (patch: Partial<TuneState>) => {
-    setValues((current) => ({ ...current, [tab]: { ...current[tab], ...patch } }));
+    setValues((current) => {
+      if (!link) return { ...current, [tab]: { ...current[tab], ...patch } };
+      const next = { ...current };
+      for (const id of ["idle", "running", "preview"] as const) {
+        next[id] = { ...next[id], ...patch };
+      }
+      return next;
+    });
   };
   const setVeil = (patch: Partial<TuneValues["veil"]>) => {
     setValues((current) => ({ ...current, veil: { ...current.veil, ...patch } }));
@@ -132,7 +141,15 @@ export function LiangTuner({ onForce }: TunerProps) {
         title="调整背景人像参数"
         aria-label="调整背景人像参数"
         data-open={open ? "true" : "false"}
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          const next = !open;
+          setOpen(next);
+          if (next) {
+            const live = liveState();
+            setTab(live);
+            onForce(live);
+          }
+        }}
       >
         ⚙
       </button>
@@ -142,6 +159,10 @@ export function LiangTuner({ onForce }: TunerProps) {
             <strong>背景人像参数</strong>
             <button type="button" onClick={() => setOpen(false)} aria-label="关闭">×</button>
           </div>
+          <label className="liang-tuner__link">
+            <input type="checkbox" checked={link} onChange={(event) => setLink(event.target.checked)} />
+            联动三态（改一个，三个一起变）
+          </label>
           <div className="liang-tuner__tabs">
             {(["idle", "running", "preview"] as const).map((id) => (
               <button

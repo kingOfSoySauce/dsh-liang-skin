@@ -28,18 +28,19 @@ export interface TuneValues {
     width: number;
     brightness: number;
     contrast: number;
+    scrim: number;
   };
 }
 
 export const TUNE_DEFAULTS: TuneValues = {
-  idle: { opacity: 0.3, scale: 1.035, cut: 30, feather: 26.7 },
-  running: { opacity: 0.7, scale: 1, cut: 20, feather: 40 },
+  idle: { opacity: 0.45, scale: 1.035, cut: 30, feather: 26.7 },
+  running: { opacity: 0.85, scale: 1, cut: 20, feather: 40 },
   preview: { opacity: 1, scale: 1, cut: 10, feather: 40 },
-  veil: { plateau: 70, a90: 0.72, a96: 0.4, edge: 0.04, ew: 42, eh: 70, cx: 75, cy: 36 },
-  image: { objectY: 36, width: 42, brightness: 1.15, contrast: 1.05 },
+  veil: { plateau: 72, a90: 0.9, a96: 0.7, edge: 0.12, ew: 46, eh: 80, cx: 75, cy: 36 },
+  image: { objectY: 36, width: 42, brightness: 1.2, contrast: 1.05, scrim: 0.3 },
 };
 
-const KEY = "dsh-liang-tune.v3";
+const KEY = "dsh-liang-tune.v5";
 
 /** Push the tuned values onto the document as CSS variables. */
 export function applyTune(values: TuneValues) {
@@ -64,6 +65,7 @@ export function applyTune(values: TuneValues) {
   style.setProperty("--liang-tune-width", `${values.image.width}vw`);
   style.setProperty("--liang-tune-brightness", String(values.image.brightness));
   style.setProperty("--liang-tune-contrast", String(values.image.contrast));
+  style.setProperty("--liang-tune-scrim", String(values.image.scrim));
 
   // Inline styles win over any stale stylesheet that a hot reload left behind.
   const root = document.querySelector(".liang-skin-backdrop");
@@ -263,6 +265,7 @@ export function LiangTuner({ onForce, liveState }: TunerProps) {
               ["宽度 vw", values.image.width, 20, 70, 1, (v: number) => setImage({ width: v })],
               ["亮度", values.image.brightness, 0.5, 2, 0.01, (v: number) => setImage({ brightness: v })],
               ["对比度", values.image.contrast, 0.5, 2, 0.01, (v: number) => setImage({ contrast: v })],
+              ["背景压暗", values.image.scrim, 0, 1, 0.01, (v: number) => setImage({ scrim: v })],
             ] as const).map(([label, value, min, max, step, patch]) => (
               <label key={label} className="liang-tuner__row">
                 <span>{label}</span>

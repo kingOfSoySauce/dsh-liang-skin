@@ -162,6 +162,7 @@ body[data-liang-skin="on"] .liang-skin-backdrop {
   position: absolute;
   inset: 0;
   content: "";
+  opacity: var(--liang-tune-scrim, 1);
   background:
     linear-gradient(90deg, var(--liang-page, transparent) 0 28%, transparent 57% 100%),
     linear-gradient(var(--liang-bg-base, transparent), var(--liang-bg-base, transparent));

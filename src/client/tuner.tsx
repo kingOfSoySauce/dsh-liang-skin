@@ -20,6 +20,12 @@ export interface TuneValues {
     edge: number;
     ew: number;
     eh: number;
+    cx: number;
+    cy: number;
+  };
+  image: {
+    objectY: number;
+    width: number;
   };
 }
 
@@ -27,7 +33,8 @@ export const TUNE_DEFAULTS: TuneValues = {
   idle: { opacity: 0.3, scale: 1.035, cut: 30, feather: 26.7 },
   running: { opacity: 0.7, scale: 1, cut: 20, feather: 40 },
   preview: { opacity: 1, scale: 1, cut: 10, feather: 40 },
-  veil: { plateau: 62, a90: 0.58, a96: 0.24, edge: 0.02, ew: 40, eh: 56 },
+  veil: { plateau: 62, a90: 0.58, a96: 0.24, edge: 0.02, ew: 40, eh: 56, cx: 75, cy: 50 },
+  image: { objectY: 42, width: 42 },
 };
 
 const KEY = "dsh-liang-tune.v1";
@@ -49,6 +56,10 @@ export function applyTune(values: TuneValues) {
   style.setProperty("--liang-tune-edge", String(veil.edge));
   style.setProperty("--liang-tune-ew", `${veil.ew}%`);
   style.setProperty("--liang-tune-eh", `${veil.eh}%`);
+  style.setProperty("--liang-tune-cx", `${veil.cx}%`);
+  style.setProperty("--liang-tune-cy", `${veil.cy}%`);
+  style.setProperty("--liang-tune-object-y", `${values.image.objectY}%`);
+  style.setProperty("--liang-tune-width", `${values.image.width}vw`);
 }
 
 function loadTune(): TuneValues {
@@ -56,7 +67,12 @@ function loadTune(): TuneValues {
     const raw = localStorage.getItem(KEY);
     if (raw === null) return TUNE_DEFAULTS;
     const parsed = JSON.parse(raw) as TuneValues;
-    return { ...TUNE_DEFAULTS, ...parsed, veil: { ...TUNE_DEFAULTS.veil, ...parsed.veil } };
+    return {
+      ...TUNE_DEFAULTS,
+      ...parsed,
+      veil: { ...TUNE_DEFAULTS.veil, ...parsed.veil },
+      image: { ...TUNE_DEFAULTS.image, ...parsed.image },
+    };
   } catch {
     return TUNE_DEFAULTS;
   }
@@ -92,6 +108,9 @@ export function LiangTuner({ onForce }: TunerProps) {
   };
   const setVeil = (patch: Partial<TuneValues["veil"]>) => {
     setValues((current) => ({ ...current, veil: { ...current.veil, ...patch } }));
+  };
+  const setImage = (patch: Partial<TuneValues["image"]>) => {
+    setValues((current) => ({ ...current, image: { ...current.image, ...patch } }));
   };
 
   const rows = useMemo(() => ([
@@ -159,6 +178,8 @@ export function LiangTuner({ onForce }: TunerProps) {
               ["边缘 α", values.veil.edge, 0, 0.3, 0.005, (v: number) => setVeil({ edge: v })],
               ["椭圆宽 %", values.veil.ew, 20, 70, 1, (v: number) => setVeil({ ew: v })],
               ["椭圆高 %", values.veil.eh, 30, 90, 1, (v: number) => setVeil({ eh: v })],
+              ["中心 X %", values.veil.cx, 0, 100, 1, (v: number) => setVeil({ cx: v })],
+              ["中心 Y %", values.veil.cy, 0, 100, 1, (v: number) => setVeil({ cy: v })],
             ] as const).map(([label, value, min, max, step, patch]) => (
               <label key={label} className="liang-tuner__row">
                 <span>{label}</span>
@@ -171,6 +192,26 @@ export function LiangTuner({ onForce }: TunerProps) {
                   onChange={(event) => patch(Number(event.target.value))}
                 />
                 <output>{Number(value).toFixed(step < 0.01 ? 3 : (step < 1 ? 2 : 0))}</output>
+              </label>
+            ))}
+          </div>
+          <div className="liang-tuner__section">人物图</div>
+          <div className="liang-tuner__rows">
+            {([
+              ["垂直位置 %", values.image.objectY, 0, 100, 1, (v: number) => setImage({ objectY: v })],
+              ["宽度 vw", values.image.width, 20, 70, 1, (v: number) => setImage({ width: v })],
+            ] as const).map(([label, value, min, max, step, patch]) => (
+              <label key={label} className="liang-tuner__row">
+                <span>{label}</span>
+                <input
+                  type="range"
+                  min={min}
+                  max={max}
+                  step={step}
+                  value={value}
+                  onChange={(event) => patch(Number(event.target.value))}
+                />
+                <output>{Number(value).toFixed(0)}</output>
               </label>
             ))}
           </div>

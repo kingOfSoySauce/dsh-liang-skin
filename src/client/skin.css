@@ -98,10 +98,10 @@ body[data-liang-skin="on"] .liang-skin-backdrop {
   top: 50%;
   right: 0;
   display: block;
-  width: min(42vw, 720px);
+  width: min(var(--liang-tune-width, 42vw), 720px);
   height: 100%;
   object-fit: cover;
-  object-position: 50% 42%;
+  object-position: 50% var(--liang-tune-object-y, 42%);
   opacity: var(--liang-portrait-opacity, 0.45);
   transform: translateY(-50%);
   filter: none;
@@ -719,7 +719,7 @@ body[data-liang-skin="on"] .liang-effort-control__range::-webkit-slider-thumb {
      image is right-aligned with width min(42vw, 720px), so its centre is at
      100% - min(21vw, 360px), 50%. The centre alpha is always 1; the stack
      opacity (30/70/100%) sets the actual centre strength. */
-  --liang-veil: radial-gradient(ellipse var(--liang-tune-ew, 40%) var(--liang-tune-eh, 56%) at calc(100% - min(21vw, 360px)) 50%,
+  --liang-veil: radial-gradient(ellipse var(--liang-tune-ew, 40%) var(--liang-tune-eh, 56%) at var(--liang-tune-cx, calc(100% - min(21vw, 360px))) var(--liang-tune-cy, 50%),
     rgb(0 0 0 / 1) 0%,
     rgb(0 0 0 / 1) var(--liang-tune-plateau, 62%),
     rgb(0 0 0 / 0.97) 72%,

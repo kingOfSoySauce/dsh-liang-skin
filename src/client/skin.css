@@ -622,6 +622,13 @@ body[data-liang-skin="on"] .liang-effort-control__range::-webkit-slider-thumb {
   transform: scale(1.035);
 }
 
+/* Dragging the slider reveals the portrait completely. */
+.liang-skin-backdrop[data-preview="true"] .liang-skin-portrait-stack,
+.liang-skin-backdrop[data-preview="true"][data-engaged="true"] .liang-skin-portrait-stack {
+  opacity: 1;
+  transform: scale(1);
+}
+
 .liang-skin-backdrop[data-engaged="false"] .liang-skin-ambient {
   opacity: 0.85;
 }

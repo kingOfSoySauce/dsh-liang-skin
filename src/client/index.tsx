@@ -249,13 +249,19 @@ class SkinPresenter {
     if (input === null) return;
     const rect = input.getBoundingClientRect();
     if (rect.width < 40 || rect.height < 10) return;
-    this.ambient.setAnchor(rect.left - 12, rect.bottom - 4);
+    this.ambient.setAnchor(rect.right - 22, rect.bottom - 6);
   }
 
   /** Reveal the immortal only while the turn is running; idle returns to the void. */
   setEngaged(engaged: boolean) {
     if (this.disposed) return;
     this.root.dataset.engaged = engaged ? "true" : "false";
+  }
+
+  /** While the user drags the slider the portrait shows at full strength. */
+  setPreviewing(previewing: boolean) {
+    if (this.disposed) return;
+    this.root.dataset.preview = previewing ? "true" : "false";
   }
 
   isEnabled() {
@@ -546,6 +552,7 @@ function LiangEffortSlider({ directory, load, select, presenter, scope, session 
           dragging.current = true;
           dragStartFrame.current = frame;
           setInteracting(true);
+          presenter.setPreviewing(true);
         }}
         onInput={(event) => {
           dragging.current = true;
@@ -555,16 +562,19 @@ function LiangEffortSlider({ directory, load, select, presenter, scope, session 
         }}
         onPointerUp={(event) => {
           setInteracting(false);
+          presenter.setPreviewing(false);
           void commit(Number(event.currentTarget.value));
         }}
         onPointerCancel={() => {
           setInteracting(false);
+          presenter.setPreviewing(false);
           dragging.current = false;
           setFrame(dragStartFrame.current);
           presenter.setFrame(dragStartFrame.current);
         }}
         onKeyUp={(event) => {
           setInteracting(false);
+          presenter.setPreviewing(false);
           if (event.key !== "Escape") void commit(Number(event.currentTarget.value));
         }}
         onBlur={(event) => {

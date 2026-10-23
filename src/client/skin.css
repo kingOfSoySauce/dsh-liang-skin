@@ -618,7 +618,7 @@ body[data-liang-skin="on"] .liang-effort-control__range::-webkit-slider-thumb {
 /* Idle: the mask keeps the centre readable as a ghost (~42%) while the rim
    fades to ~2%, so the silhouette dissolves into the void. */
 .liang-skin-backdrop[data-engaged="false"] .liang-skin-portrait-stack {
-  opacity: 0.67;
+  opacity: 0.87;
   transform: scale(1.035);
 }
 

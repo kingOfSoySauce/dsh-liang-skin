@@ -243,6 +243,15 @@ class SkinPresenter {
     this.setEnabled(this.scope.getSnapshot().enabled);
   }
 
+  /** Aim the plume at the active portrait's face. */
+  private syncTarget() {
+    const frame = this.layers.find((layer) => layer.dataset.active === "true");
+    if (frame === undefined) return;
+    const rect = frame.getBoundingClientRect();
+    if (rect.width < 40 || rect.height < 40) return;
+    this.ambient.setTarget(rect.left + rect.width * 0.5, rect.top + rect.height * 0.38);
+  }
+
   /** Spill particles from the composer's lower-left corner. */
   private syncAnchor() {
     const input = document.querySelector<HTMLElement>('[contenteditable="true"]');
@@ -250,6 +259,7 @@ class SkinPresenter {
     const rect = input.getBoundingClientRect();
     if (rect.width < 40 || rect.height < 10) return;
     this.ambient.setAnchor(rect.right - 22, rect.bottom - 6);
+    this.syncTarget();
   }
 
   /** Reveal the immortal only while the turn is running; idle returns to the void. */
@@ -341,6 +351,7 @@ class SkinPresenter {
     body.style.setProperty("--liang-portrait-opacity", palette.portraitOpacity);
     this.ambient.setLevel(palette.level, palette.stage === 5);
     this.syncAnchor();
+    this.syncTarget();
     this.updatePortrait(palette.level);
   }
 

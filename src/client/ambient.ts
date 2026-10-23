@@ -1,6 +1,7 @@
 export interface AmbientHandle {
   setLevel(level: number, dark: boolean): void;
   setAnchor(x: number, y: number): void;
+  setTarget(x: number, y: number): void;
   start(): void;
   stop(): void;
   dispose(): void;
@@ -94,7 +95,7 @@ export function createAmbient(canvas: HTMLCanvasElement): AmbientHandle {
   });
 
   if (gl === null || display === null) {
-    return { setLevel() {}, setAnchor() {}, start() {}, stop() {}, dispose() {} };
+    return { setLevel() {}, setAnchor() {}, setTarget() {}, start() {}, stop() {}, dispose() {} };
   }
 
   const reduceMotion = typeof matchMedia === "function"
@@ -151,8 +152,10 @@ export function createAmbient(canvas: HTMLCanvasElement): AmbientHandle {
   let pointerVY = 0;
   let pointerDown = false;
   let lastPointer = 0;
-  let anchorX = 0.34;
-  let anchorY = 0.62;
+  let anchorX = 0.86;
+  let anchorY = 0.6;
+  let targetX = 0.78;
+  let targetY = 0.4;
 
   const gold: [number, number, number] = [0.86, 0.68, 0.36];
   const cool: [number, number, number] = [0.74, 0.8, 0.92];
@@ -269,6 +272,16 @@ export function createAmbient(canvas: HTMLCanvasElement): AmbientHandle {
         }
       }
 
+      // Drift toward the face: a soft wind rather than a swirl.
+      const faceX = targetX * width;
+      const faceY = targetY * height;
+      const toFaceX = faceX - particle.x;
+      const toFaceY = faceY - particle.y;
+      const faceDistance = Math.hypot(toFaceX, toFaceY) || 1;
+      const pull = 26 * dt * levelFactor;
+      particle.vx += (toFaceX / faceDistance) * pull;
+      particle.vy += (toFaceY / faceDistance) * pull;
+
       particle.vx *= Math.max(0, 1 - 0.8 * dt);
       particle.vy *= Math.max(0, 1 - 0.8 * dt);
       particle.x += particle.vx * dt;
@@ -369,6 +382,10 @@ export function createAmbient(canvas: HTMLCanvasElement): AmbientHandle {
   };
 
   return {
+    setTarget(x, y) {
+      targetX = clamp(x / Math.max(1, window.innerWidth), 0.05, 0.95);
+      targetY = clamp(y / Math.max(1, window.innerHeight), 0.05, 0.95);
+    },
     setAnchor(x, y) {
       anchorX = clamp(x / Math.max(1, window.innerWidth), 0.05, 0.95);
       anchorY = clamp(y / Math.max(1, window.innerHeight), 0.05, 0.95);

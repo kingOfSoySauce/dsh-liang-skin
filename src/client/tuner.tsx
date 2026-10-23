@@ -306,8 +306,8 @@ export function LiangTuner({ onForce, liveState }: TunerProps) {
               ["90% 处 α", values.veil.a90, 0, 1, 0.01, (v: number) => setVeil({ a90: v })],
               ["96% 处 α", values.veil.a96, 0, 1, 0.01, (v: number) => setVeil({ a96: v })],
               ["边缘 α", values.veil.edge, 0, 0.3, 0.005, (v: number) => setVeil({ edge: v })],
-              ["椭圆宽 %", values.veil.ew, 20, 70, 1, (v: number) => setVeil({ ew: v })],
-              ["椭圆高 %", values.veil.eh, 30, 90, 1, (v: number) => setVeil({ eh: v })],
+              ["椭圆宽 %", values.veil.ew, 5, 70, 1, (v: number) => setVeil({ ew: v })],
+              ["椭圆高 %", values.veil.eh, 5, 90, 1, (v: number) => setVeil({ eh: v })],
               ["中心 X %", values.veil.cx, 0, 100, 1, (v: number) => setVeil({ cx: v })],
               ["中心 Y %（小=上）", values.veil.cy, 0, 100, 1, (v: number) => setVeil({ cy: v })],
             ] as const).map(([label, value, min, max, step, patch]) => (

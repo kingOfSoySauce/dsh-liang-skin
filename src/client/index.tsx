@@ -714,6 +714,11 @@ function createPreferenceStore(): PreferenceStore {
 }
 
 export function apply(ctx: ClientContext) {
+  // Drop styles left behind by earlier hot reloads; otherwise an old rule can
+  // win over the freshly injected one and the tuner appears to do nothing.
+  for (const stale of Array.from(document.querySelectorAll(`style[data-plugin="${PACKAGE_ID}"]`))) {
+    stale.remove();
+  }
   const style = document.createElement("style");
   style.dataset.plugin = PACKAGE_ID;
   style.textContent = styles;

@@ -39,7 +39,7 @@ export const TUNE_DEFAULTS: TuneValues = {
   image: { objectY: 36, width: 42, brightness: 1.15, contrast: 1.05 },
 };
 
-const KEY = "dsh-liang-tune.v2";
+const KEY = "dsh-liang-tune.v3";
 
 /** Push the tuned values onto the document as CSS variables. */
 export function applyTune(values: TuneValues) {
@@ -64,6 +64,31 @@ export function applyTune(values: TuneValues) {
   style.setProperty("--liang-tune-width", `${values.image.width}vw`);
   style.setProperty("--liang-tune-brightness", String(values.image.brightness));
   style.setProperty("--liang-tune-contrast", String(values.image.contrast));
+
+  // Inline styles win over any stale stylesheet that a hot reload left behind.
+  const root = document.querySelector(".liang-skin-backdrop");
+
+  const state = root?.dataset.preview === "true"
+    ? "preview"
+    : root?.dataset.engaged === "true"
+      ? "running"
+      : "idle";
+  const current = values[state];
+  const veilCss = `radial-gradient(ellipse ${veil.ew}% ${veil.eh}% at ${veil.cx}% ${veil.cy}%, #000 0%, #000 ${veil.plateau}%, rgba(0,0,0,0.97) 72%, rgba(0,0,0,0.86) 82%, rgba(0,0,0,${veil.a90}) 90%, rgba(0,0,0,${veil.a96}) 96%, rgba(0,0,0,${veil.edge}) 100%)`;
+  for (const stack of Array.from(document.querySelectorAll<HTMLElement>(".liang-skin-portrait-stack"))) {
+    stack.style.setProperty("--liang-veil", veilCss);
+    stack.style.webkitMaskImage = veilCss;
+    stack.style.maskImage = veilCss;
+    stack.style.setProperty("--liang-corner-cut", `${current.cut}%`);
+    stack.style.setProperty("--liang-corner-feather", `${current.feather}%`);
+    stack.style.opacity = String(current.opacity);
+    stack.style.transform = `scale(${current.scale})`;
+    stack.style.filter = `brightness(${values.image.brightness}) contrast(${values.image.contrast})`;
+    for (const frame of Array.from(stack.querySelectorAll<HTMLElement>("img.liang-skin-frame"))) {
+      frame.style.objectPosition = `50% ${values.image.objectY}%`;
+      frame.style.width = `min(${values.image.width}vw, 720px)`;
+    }
+  }
 }
 
 function loadTune(): TuneValues {
@@ -106,6 +131,17 @@ export function LiangTuner({ onForce, liveState }: TunerProps) {
     } catch {
       // Storage may be unavailable; the live values still apply.
     }
+    // Keep the inline opacity in sync with idle/running/preview transitions.
+    // A hot reload can leave the previous generation's timer alive; clear it
+    // first so stale values never overwrite the current ones.
+    const host = window as typeof window & { __liangTunerTimer?: number };
+    if (host.__liangTunerTimer !== undefined) window.clearInterval(host.__liangTunerTimer);
+    const timer = window.setInterval(() => applyTune(values), 400);
+    host.__liangTunerTimer = timer;
+    return () => {
+      window.clearInterval(timer);
+      if (host.__liangTunerTimer === timer) host.__liangTunerTimer = undefined;
+    };
   }, [values]);
 
   const state = values[tab];

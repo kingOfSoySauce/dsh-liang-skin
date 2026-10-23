@@ -543,3 +543,95 @@ body[data-liang-skin="on"] .liang-effort-control__range::-webkit-slider-thumb {
     transition: none;
   }
 }
+
+/* --- Animated backdrop: crossfading portrait stack + additive light layer --- */
+.liang-skin-portrait-stack {
+  position: absolute;
+  inset: 0;
+  display: none;
+  opacity: var(--liang-portrait-opacity, 0.82);
+  transition: opacity 260ms ease;
+}
+
+.liang-skin-backdrop[data-media="sequence"] .liang-skin-portrait-stack {
+  display: block;
+}
+
+.liang-skin-backdrop img.liang-skin-frame {
+  display: block;
+  opacity: 0;
+  transition: opacity 650ms ease;
+}
+
+.liang-skin-backdrop img.liang-skin-frame[data-active="true"] {
+  opacity: 1;
+}
+
+.liang-skin-ambient {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 300ms ease;
+}
+
+@media (max-width: 760px) {
+  .liang-skin-portrait-stack {
+    opacity: calc(var(--liang-portrait-opacity, 0.82) * 0.72);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liang-skin-portrait-stack,
+  .liang-skin-backdrop img.liang-skin-frame,
+  .liang-skin-ambient {
+    transition: none;
+  }
+}
+
+/* --- Engagement: the immortal surfaces while a turn runs, then withdraws --- */
+.liang-skin-portrait-stack {
+  transform-origin: 50% 42%;
+  transition: opacity 1400ms ease, transform 1800ms ease;
+  /* Gaussian falloff (sigma ~0.37) sampled into gradient stops. */
+  --liang-veil: radial-gradient(ellipse 62% 58% at 50% 40%,
+    rgba(0, 0, 0, 1) 0%,
+    rgba(0, 0, 0, 0.92) 15%,
+    rgba(0, 0, 0, 0.72) 30%,
+    rgba(0, 0, 0, 0.48) 45%,
+    rgba(0, 0, 0, 0.27) 60%,
+    rgba(0, 0, 0, 0.13) 75%,
+    rgba(0, 0, 0, 0.05) 90%,
+    rgba(0, 0, 0, 0.02) 100%);
+  -webkit-mask-image: var(--liang-veil);
+  mask-image: var(--liang-veil);
+}
+
+.liang-skin-backdrop[data-engaged="true"] .liang-skin-portrait-stack {
+  opacity: var(--liang-portrait-opacity, 0.82);
+  transform: scale(1);
+}
+
+/* Idle: the mask keeps the centre readable as a ghost (~42%) while the rim
+   fades to ~2%, so the silhouette dissolves into the void. */
+.liang-skin-backdrop[data-engaged="false"] .liang-skin-portrait-stack {
+  opacity: 0.67;
+  transform: scale(1.035);
+}
+
+.liang-skin-backdrop[data-engaged="false"] .liang-skin-ambient {
+  opacity: 0.85;
+}
+
+.liang-skin-backdrop[data-engaged="false"] .liang-skin-frame {
+  transition-duration: 1400ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liang-skin-portrait-stack {
+    transition: none;
+  }
+}

@@ -21,3 +21,5 @@ test-results/
 /design-qa-final.png
 /design-qa.md
 /docs/demo.gif
+/assets/*/.src/
+/lib/.dev/

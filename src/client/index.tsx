@@ -13,6 +13,7 @@ import type {} from "@deepseek-ai/dsh-client-ui-settings/client";
 import type {} from "@deepseek-ai/dsh-client-ui-model-selection/client";
 import styles from "./skin.css";
 import { installLiangAppearanceButton } from "./appearance";
+import { createAmbient, type AmbientHandle } from "./ambient";
 import { createPortraitLoader } from "./portrait-loader";
 import {
   FINE_STEPS,
@@ -106,12 +107,18 @@ interface ModelDirectory {
   select(selection: ModelSelection): Promise<{ ok: boolean }>;
 }
 
+interface SessionLike {
+  subscribe(listener: () => void): () => void;
+  getSnapshot(): { running?: boolean } | null;
+}
+
 interface SliderProps {
   directory: SnapshotStore<ModelDirectoryState>;
   load: () => void;
   select: (selection: ModelSelection) => Promise<boolean>;
   presenter: SkinPresenter;
   scope: PreferenceStore;
+  session?: SessionLike;
 }
 
 interface EffortBindingRowProps {
@@ -141,8 +148,15 @@ class SkinPresenter {
   private readonly scope: PreferenceStore;
   private readonly theme: ThemeService;
   private readonly root: HTMLDivElement;
+  private readonly stack: HTMLDivElement;
+  private readonly layers: [HTMLImageElement, HTMLImageElement];
+  private readonly canvas: HTMLCanvasElement;
+  private readonly ambient: AmbientHandle;
   private readonly portraits: ReturnType<typeof createPortraitLoader>;
   private enabled = true;
+  private activeLayer: 0 | 1 = 1;
+  private currentUrl: string | null = null;
+  private clearTimer: number | null = null;
   // Default to the max frame so the first paint after load is the dark shell;
   // starting at 0 flashed the light palette before the directory resolved.
   private frame = PREVIEW_MAX_FRAME;
@@ -158,35 +172,90 @@ class SkinPresenter {
     this.root.className = "liang-skin-backdrop";
     this.root.dataset.plugin = PACKAGE_ID;
     this.root.dataset.media = "color";
+    this.root.dataset.engaged = "false";
     this.root.setAttribute("aria-hidden", "true");
+
+    this.stack = document.createElement("div");
+    this.stack.className = "liang-skin-portrait-stack";
+    const layer = () => {
+      const image = document.createElement("img");
+      image.className = "liang-skin-frame";
+      image.alt = "";
+      image.draggable = false;
+      image.dataset.active = "false";
+      this.stack.append(image);
+      return image;
+    };
+    this.layers = [layer(), layer()];
+
+    this.canvas = document.createElement("canvas");
+    this.canvas.className = "liang-skin-ambient";
+    this.ambient = createAmbient(this.canvas);
+
+    this.root.append(this.stack, this.canvas);
+
     this.portraits = createPortraitLoader({
       sources: PORTRAIT_ANCHORS.map(({ level, file }) => ({
         level,
-        url: `${ASSET_PREFIX}/portrait-source-v2/${file}`,
+        url: `${ASSET_PREFIX}/portrait-source-xianxia-v2/${file}`,
       })),
-      onChange: ({ image }) => {
+      onChange: ({ url }) => {
         if (this.disposed || !this.enabled) return;
-        if (image === null) {
+        if (url === null) {
           this.root.dataset.media = "color";
-          this.root.replaceChildren();
+          this.currentUrl = null;
+          for (const image of this.layers) {
+            image.dataset.active = "false";
+            image.removeAttribute("src");
+          }
           return;
         }
-        // Reuse the decoded node so a frame swap cannot start a second fetch.
-        const portrait = image as HTMLImageElement;
-        portrait.className = "liang-skin-sequence-frame";
-        portrait.alt = "";
-        portrait.draggable = false;
-        if (this.root.firstChild !== portrait) this.root.replaceChildren(portrait);
-        this.root.dataset.media = "sequence";
+        this.showPortrait(url);
       },
     });
 
+    window.addEventListener("resize", () => this.syncAnchor());
     this.unsubscribe = scope.subscribe(() => this.syncSettings());
     this.syncSettings();
   }
 
+  /** Crossfade between decoded frames so a level change never hard-cuts. */
+  private showPortrait(url: string) {
+    if (url === this.currentUrl) return;
+    const nextIndex = this.activeLayer === 0 ? 1 : 0;
+    const next = this.layers[nextIndex];
+    const previous = this.layers[this.activeLayer];
+    this.currentUrl = url;
+    this.root.dataset.media = "sequence";
+    next.src = url;
+    next.dataset.active = "true";
+    previous.dataset.active = "false";
+    this.activeLayer = nextIndex;
+    if (this.clearTimer !== null) window.clearTimeout(this.clearTimer);
+    this.clearTimer = window.setTimeout(() => {
+      this.clearTimer = null;
+      const idle = this.layers[this.activeLayer === 0 ? 1 : 0];
+      if (idle.dataset.active === "false") idle.removeAttribute("src");
+    }, 800);
+  }
+
   private syncSettings() {
     this.setEnabled(this.scope.getSnapshot().enabled);
+  }
+
+  /** Spill particles from the composer's lower-left corner. */
+  private syncAnchor() {
+    const input = document.querySelector<HTMLElement>('[contenteditable="true"]');
+    if (input === null) return;
+    const rect = input.getBoundingClientRect();
+    if (rect.width < 40 || rect.height < 10) return;
+    this.ambient.setAnchor(rect.left - 12, rect.bottom - 4);
+  }
+
+  /** Reveal the immortal only while the turn is running; idle returns to the void. */
+  setEngaged(engaged: boolean) {
+    if (this.disposed) return;
+    this.root.dataset.engaged = engaged ? "true" : "false";
   }
 
   isEnabled() {
@@ -205,12 +274,24 @@ class SkinPresenter {
       document.body.dataset.liangSkin = "on";
       this.applyFrame();
       this.portraits.start();
+      this.ambient.start();
+      this.syncAnchor();
+      window.setTimeout(() => this.syncAnchor(), 400);
     } else {
       if (this.raf !== 0) cancelAnimationFrame(this.raf);
       this.raf = 0;
+      this.ambient.stop();
+      if (this.clearTimer !== null) {
+        window.clearTimeout(this.clearTimer);
+        this.clearTimer = null;
+      }
       this.root.remove();
       this.portraits.stop();
-      this.root.replaceChildren();
+      this.currentUrl = null;
+      for (const image of this.layers) {
+        image.dataset.active = "false";
+        image.removeAttribute("src");
+      }
       this.root.dataset.media = "color";
       delete document.body.dataset.liangSkin;
       delete document.body.dataset.liangStage;
@@ -252,6 +333,8 @@ class SkinPresenter {
     body.style.setProperty("--liang-accent-hover", palette.accentHover);
     body.style.setProperty("--liang-hover", palette.hover);
     body.style.setProperty("--liang-portrait-opacity", palette.portraitOpacity);
+    this.ambient.setLevel(palette.level, palette.stage === 5);
+    this.syncAnchor();
     this.updatePortrait(palette.level);
   }
 
@@ -280,11 +363,23 @@ class SkinPresenter {
     this.unsubscribe();
     if (this.raf !== 0) cancelAnimationFrame(this.raf);
     this.portraits.dispose();
+    this.ambient.dispose();
+    if (this.clearTimer !== null) {
+      window.clearTimeout(this.clearTimer);
+      this.clearTimer = null;
+    }
     this.root.remove();
     document.body.removeAttribute("data-liang-skin");
     delete document.body.dataset.liangStage;
     for (const name of cssVariables) document.body.style.removeProperty(name);
   }
+}
+
+function useSessionRunning(session: SessionLike | undefined) {
+  const subscribe = (listener: () => void) => session?.subscribe(listener) ?? (() => {});
+  const getSnapshot = () => session?.getSnapshot() ?? null;
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot);
+  return snapshot?.running === true;
 }
 
 function modelReasoning(state: ModelDirectoryState) {
@@ -300,7 +395,7 @@ function modelReasoning(state: ModelDirectoryState) {
   };
 }
 
-function LiangEffortSlider({ directory, load, select, presenter, scope }: SliderProps) {
+function LiangEffortSlider({ directory, load, select, presenter, scope, session }: SliderProps) {
   const state = useSyncExternalStore(
     (listener) => directory.subscribe(listener),
     () => directory.getSnapshot(),
@@ -336,22 +431,33 @@ function LiangEffortSlider({ directory, load, select, presenter, scope }: Slider
   const selfCommitted = useRef(-1);
   const lastCommitted = useRef(committedIndex);
   const enabled = skin.enabled;
+  const running = useSessionRunning(session);
 
   useEffect(() => {
     if (enabled) load();
   }, [enabled, load]);
 
   useEffect(() => {
+    presenter.setEngaged(running);
+  }, [presenter, running]);
+
+  useEffect(() => () => presenter.setEngaged(false), [presenter]);
+
+  useEffect(() => {
     const previous = lastCommitted.current;
     lastCommitted.current = committedIndex;
     if (!bindEffort || dragging.current || pending) return;
+    // While the host re-selects a model the effort can read as unknown for a
+    // render; that must not yank the thumb to the max frame.
+    if (state.status === "selecting") return;
+    if (committedIndex < 0 && selfCommitted.current >= 0) return;
     // Same effort as before, or the host just caught up with our own submit:
     // keep the fine stop instead of snapping back to the effort anchor.
     if (committedIndex === previous) return;
     if (selfCommitted.current === committedIndex) return;
     setFrame(committedFrame);
     presenter.setFrame(committedFrame);
-  }, [bindEffort, committedFrame, committedIndex, pending, presenter]);
+  }, [bindEffort, committedFrame, committedIndex, pending, presenter, state.status]);
 
   if (!enabled) return null;
   if (bindEffort && (reasoning === null || efforts.length < 2)) return null;
@@ -598,10 +704,15 @@ export function apply(ctx: ClientContext) {
     inject: (sessionId: string) => {
       const available = ctx.sessions.subagentAddress(sessionId) === undefined;
       const directory = ctx.modelDirectories.directoryFor(sessionId) as ModelDirectory;
+      const scopeCtx = (ctx.sessions as { scope?: (id: string) => unknown }).scope?.(sessionId);
+      const session = scopeCtx === undefined
+        ? undefined
+        : (ctx.sessions as { sessionOf?: (scope: unknown) => SessionLike }).sessionOf?.(scopeCtx);
       return {
         directory: directory.store,
         presenter,
         scope,
+        session,
         load: () => {
           if (available) void directory.load().catch(() => undefined);
         },

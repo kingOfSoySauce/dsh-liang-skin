@@ -9,30 +9,30 @@ export const SETTINGS_NAMESPACE = "liang-intensity-skin";
 export const ASSET_PREFIX = `/plugins/${PACKAGE_ID}/assets/`;
 
 const ASSET_SPECS = [
-  ["portrait-source-v2/stage-00.webp", "image/webp"],
-  ["portrait-source-v2/level-01.webp", "image/webp"],
-  ["portrait-source-v2/level-03.webp", "image/webp"],
-  ["portrait-source-v2/level-04.webp", "image/webp"],
-  ["portrait-source-v2/stage-06.webp", "image/webp"],
-  ["portrait-source-v2/level-07.webp", "image/webp"],
-  ["portrait-source-v2/level-09.webp", "image/webp"],
-  ["portrait-source-v2/level-10.webp", "image/webp"],
-  ["portrait-source-v2/stage-12.webp", "image/webp"],
-  ["portrait-source-v2/level-13.webp", "image/webp"],
-  ["portrait-source-v2/level-14.webp", "image/webp"],
-  ["portrait-source-v2/bridge-15.webp", "image/webp"],
-  ["portrait-source-v2/level-16.webp", "image/webp"],
-  ["portrait-source-v2/level-17.webp", "image/webp"],
-  ["portrait-source-v2/stage-18.webp", "image/webp"],
-  ["portrait-source-v2/level-19.webp", "image/webp"],
-  ["portrait-source-v2/level-21.webp", "image/webp"],
-  ["portrait-source-v2/level-22.webp", "image/webp"],
-  ["portrait-source-v2/stage-24.webp", "image/webp"],
-  ["portrait-source-v2/level-25.webp", "image/webp"],
-  ["portrait-source-v2/bridge-27.webp", "image/webp"],
-  ["portrait-source-v2/level-28.webp", "image/webp"],
-  ["portrait-source-v2/level-29.webp", "image/webp"],
-  ["portrait-source-v2/stage-30.webp", "image/webp"],
+  ["portrait-source-xianxia-v2/stage-00.webp", "image/webp"],
+  ["portrait-source-xianxia-v2/level-01.webp", "image/webp"],
+  ["portrait-source-xianxia-v2/level-03.webp", "image/webp"],
+  ["portrait-source-xianxia-v2/level-04.webp", "image/webp"],
+  ["portrait-source-xianxia-v2/stage-06.webp", "image/webp"],
+  ["portrait-source-xianxia-v2/level-07.webp", "image/webp"],
+  ["portrait-source-xianxia-v2/level-09.webp", "image/webp"],
+  ["portrait-source-xianxia-v2/level-10.webp", "image/webp"],
+  ["portrait-source-xianxia-v2/stage-12.webp", "image/webp"],
+  ["portrait-source-xianxia-v2/level-13.webp", "image/webp"],
+  ["portrait-source-xianxia-v2/level-14.webp", "image/webp"],
+  ["portrait-source-xianxia-v2/bridge-15.webp", "image/webp"],
+  ["portrait-source-xianxia-v2/level-16.webp", "image/webp"],
+  ["portrait-source-xianxia-v2/level-17.webp", "image/webp"],
+  ["portrait-source-xianxia-v2/stage-18.webp", "image/webp"],
+  ["portrait-source-xianxia-v2/level-19.webp", "image/webp"],
+  ["portrait-source-xianxia-v2/level-21.webp", "image/webp"],
+  ["portrait-source-xianxia-v2/level-22.webp", "image/webp"],
+  ["portrait-source-xianxia-v2/stage-24.webp", "image/webp"],
+  ["portrait-source-xianxia-v2/level-25.webp", "image/webp"],
+  ["portrait-source-xianxia-v2/bridge-27.webp", "image/webp"],
+  ["portrait-source-xianxia-v2/level-28.webp", "image/webp"],
+  ["portrait-source-xianxia-v2/level-29.webp", "image/webp"],
+  ["portrait-source-xianxia-v2/stage-30.webp", "image/webp"],
 ];
 
 function send(res, status, headers = {}) {
@@ -157,3 +157,5 @@ export function apply(ctx) {
     };
   }, "liang-intensity-skin: static media route");
 }
+
+// dev: touched 2026-10-22T21:11:14.7347668+08:00

@@ -15,8 +15,8 @@ export interface TuneValues {
   preview: TuneState;
   veil: {
     plateau: number;
-    a90: number;
-    a96: number;
+    a50: number;
+    a85: number;
     edge: number;
     ew: number;
     eh: number;
@@ -42,12 +42,12 @@ export const TUNE_DEFAULTS: TuneValues = {
   idle: { opacity: 0.45, scale: 1.035, cut: 30, feather: 26.7 },
   running: { opacity: 0.85, scale: 1, cut: 20, feather: 40 },
   preview: { opacity: 1, scale: 1, cut: 10, feather: 40 },
-  veil: { plateau: 72, a90: 0.9, a96: 0.7, edge: 0.12, ew: 46, eh: 80, cx: 75, cy: 36 },
+  veil: { plateau: 40, a50: 0.85, a85: 0.45, edge: 0.1, ew: 46, eh: 80, cx: 75, cy: 36 },
   image: { objectY: 36, width: 42, brightness: 1, contrast: 1, scrim: 0.3 },
   mask: { edgeX: 0, edgeY: 0, featherX: 32, featherY: 26 },
 };
 
-const KEY = "dsh-liang-tune.v5";
+const KEY = "dsh-liang-tune.v7";
 const POS_KEY = "dsh-liang-tune.pos";
 
 function loadPos(): { x: number; y: number } | null {
@@ -71,8 +71,8 @@ export function applyTune(values: TuneValues) {
   }
   const veil = values.veil;
   style.setProperty("--liang-tune-plateau", `${veil.plateau}%`);
-  style.setProperty("--liang-tune-a90", String(veil.a90));
-  style.setProperty("--liang-tune-a96", String(veil.a96));
+  style.setProperty("--liang-tune-a50", String(veil.a50));
+  style.setProperty("--liang-tune-a85", String(veil.a85));
   style.setProperty("--liang-tune-edge", String(veil.edge));
   style.setProperty("--liang-tune-ew", `${veil.ew}%`);
   style.setProperty("--liang-tune-eh", `${veil.eh}%`);
@@ -93,11 +93,18 @@ export function applyTune(values: TuneValues) {
       ? "running"
       : "idle";
   const current = values[state];
-  const veilCss = `radial-gradient(ellipse ${veil.ew}% ${veil.eh}% at ${veil.cx}% ${veil.cy}%, #000 0%, #000 ${veil.plateau}%, rgba(0,0,0,0.97) 72%, rgba(0,0,0,0.86) 82%, rgba(0,0,0,${veil.a90}) 90%, rgba(0,0,0,${veil.a96}) 96%, rgba(0,0,0,${veil.edge}) 100%)`;
+  const veilCss = [
+    `#000 0%`,
+    `#000 ${veil.plateau}%`,
+    ...(veil.plateau < 50 ? [`rgba(0,0,0,${veil.a50}) 50%`] : []),
+    ...(veil.plateau < 85 ? [`rgba(0,0,0,${veil.a85}) 85%`] : []),
+    `rgba(0,0,0,${veil.edge}) 100%`,
+  ].join(", ");
+  const veilGradient = `radial-gradient(ellipse ${veil.ew}% ${veil.eh}% at ${veil.cx}% ${veil.cy}%, ${veilCss})`;
   for (const stack of Array.from(document.querySelectorAll<HTMLElement>(".liang-skin-portrait-stack"))) {
-    stack.style.setProperty("--liang-veil", veilCss);
-    stack.style.webkitMaskImage = veilCss;
-    stack.style.maskImage = veilCss;
+    stack.style.setProperty("--liang-veil", veilGradient);
+    stack.style.webkitMaskImage = veilGradient;
+    stack.style.maskImage = veilGradient;
     stack.style.setProperty("--liang-corner-cut", `${current.cut}%`);
     stack.style.setProperty("--liang-corner-feather", `${current.feather}%`);
     stack.style.opacity = String(current.opacity);
@@ -302,9 +309,9 @@ export function LiangTuner({ onForce, liveState }: TunerProps) {
           <div className="liang-tuner__section">高斯蒙版（三态共用）</div>
           <div className="liang-tuner__rows">
             {([
-              ["平台 %", values.veil.plateau, 40, 80, 1, (v: number) => setVeil({ plateau: v })],
-              ["90% 处 α", values.veil.a90, 0, 1, 0.01, (v: number) => setVeil({ a90: v })],
-              ["96% 处 α", values.veil.a96, 0, 1, 0.01, (v: number) => setVeil({ a96: v })],
+              ["平台 %", values.veil.plateau, 0, 90, 1, (v: number) => setVeil({ plateau: v })],
+              ["50% 处 α", values.veil.a50, 0, 1, 0.01, (v: number) => setVeil({ a50: v })],
+              ["85% 处 α", values.veil.a85, 0, 1, 0.01, (v: number) => setVeil({ a85: v })],
               ["边缘 α", values.veil.edge, 0, 0.3, 0.005, (v: number) => setVeil({ edge: v })],
               ["椭圆宽 %", values.veil.ew, 5, 70, 1, (v: number) => setVeil({ ew: v })],
               ["椭圆高 %", values.veil.eh, 5, 90, 1, (v: number) => setVeil({ eh: v })],

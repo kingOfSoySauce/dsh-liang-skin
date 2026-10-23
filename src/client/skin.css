@@ -47,13 +47,24 @@ body[data-liang-skin="on"] .liang-skin-backdrop {
   opacity: var(--liang-portrait-opacity, 0.45);
   transform: translateY(-50%);
   filter: none;
-  --liang-image-veil: linear-gradient(90deg,
-    rgb(0 0 0 / calc(var(--liang-veil-clear) + (1 - var(--liang-veil-clear)) * 0)) 0%,
-    rgb(0 0 0 / calc(var(--liang-veil-clear) + (1 - var(--liang-veil-clear)) * 0.2)) 10%,
+  /* Idle keeps the old broad left fade. As the veil clears, the horizontal
+     and vertical layers intersect into a four-edge 12% feather, so the full
+     portrait still melts into the page instead of showing a hard rectangle. */
+  --liang-image-h: linear-gradient(90deg,
+    rgb(0 0 0 / 0) 0%,
+    rgb(0 0 0 / calc(0.2 + var(--liang-veil-clear) * 0.8)) 12%,
     rgb(0 0 0 / 1) 30%,
-    rgb(0 0 0 / 1) 100%);
-  -webkit-mask-image: var(--liang-image-veil);
-  mask-image: var(--liang-image-veil);
+    rgb(0 0 0 / 1) 88%,
+    rgb(0 0 0 / calc(1 - var(--liang-veil-clear))) 100%);
+  --liang-image-v: linear-gradient(180deg,
+    rgb(0 0 0 / calc(1 - var(--liang-veil-clear))) 0%,
+    rgb(0 0 0 / 1) 12%,
+    rgb(0 0 0 / 1) 88%,
+    rgb(0 0 0 / calc(1 - var(--liang-veil-clear))) 100%);
+  -webkit-mask-image: var(--liang-image-h), var(--liang-image-v);
+  mask-image: var(--liang-image-h), var(--liang-image-v);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
   transition: filter 180ms linear;
 }
 

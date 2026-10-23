@@ -14,6 +14,7 @@ import type {} from "@deepseek-ai/dsh-client-ui-model-selection/client";
 import styles from "./skin.css";
 import { installLiangAppearanceButton } from "./appearance";
 import { createAmbient, type AmbientHandle } from "./ambient";
+import { LiangTuner, type TuneStateId } from "./tuner";
 import { createPortraitLoader } from "./portrait-loader";
 import {
   FINE_STEPS,
@@ -29,6 +30,8 @@ import {
 } from "./logic";
 
 const PACKAGE_ID = "dsh-client-liang-intensity-skin";
+// Temporary tuning entry: flip to false once the values are settled.
+const SHOW_TUNER = true;
 const LOCALE_NAMESPACE = "liang.skin";
 const ASSET_PREFIX = `/plugins/${PACKAGE_ID}/assets`;
 const BIND_EFFORT_KEY = "dsh-liang-intensity-skin.bind-effort";
@@ -602,6 +605,20 @@ function LiangEffortSlider({ directory, load, select, presenter, scope, session 
           }
         }}
       />
+      {SHOW_TUNER && <LiangTuner
+        onForce={(state: TuneStateId) => {
+          if (state === "idle") {
+            presenter.setPreviewing(false);
+            presenter.setEngaged(false);
+          } else if (state === "running") {
+            presenter.setPreviewing(false);
+            presenter.setEngaged(true);
+          } else {
+            presenter.setEngaged(true);
+            presenter.setPreviewing(true);
+          }
+        }}
+      />}
     </div>
   );
 }

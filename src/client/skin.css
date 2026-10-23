@@ -719,35 +719,41 @@ body[data-liang-skin="on"] .liang-effort-control__range::-webkit-slider-thumb {
      image is right-aligned with width min(42vw, 720px), so its centre is at
      100% - min(21vw, 360px), 50%. The centre alpha is always 1; the stack
      opacity (30/70/100%) sets the actual centre strength. */
-  --liang-veil: radial-gradient(ellipse 40% 56% at calc(100% - min(21vw, 360px)) 50%,
+  --liang-veil: radial-gradient(ellipse var(--liang-tune-ew, 40%) var(--liang-tune-eh, 56%) at calc(100% - min(21vw, 360px)) 50%,
     rgb(0 0 0 / 1) 0%,
-    rgb(0 0 0 / 1) 62%,
+    rgb(0 0 0 / 1) var(--liang-tune-plateau, 62%),
     rgb(0 0 0 / 0.97) 72%,
     rgb(0 0 0 / 0.86) 82%,
-    rgb(0 0 0 / 0.58) 90%,
-    rgb(0 0 0 / 0.24) 96%,
-    rgb(0 0 0 / 0.02) 100%);
+    rgb(0 0 0 / var(--liang-tune-a90, 0.58)) 90%,
+    rgb(0 0 0 / var(--liang-tune-a96, 0.24)) 96%,
+    rgb(0 0 0 / var(--liang-tune-edge, 0.02)) 100%);
   -webkit-mask-image: var(--liang-veil);
   mask-image: var(--liang-veil);
 }
 
 .liang-skin-backdrop[data-engaged="true"] .liang-skin-portrait-stack {
-  opacity: 0.7;
-  transform: scale(1);
+  opacity: var(--liang-tune-running-opacity, 0.7);
+  transform: scale(var(--liang-tune-running-scale, 1));
+  --liang-corner-cut: var(--liang-tune-running-cut, 20%);
+  --liang-corner-feather: var(--liang-tune-running-feather, 40%);
 }
 
 /* Idle: the mask keeps the centre readable as a ghost (~42%) while the rim
    fades to ~2%, so the silhouette dissolves into the void. */
 .liang-skin-backdrop[data-engaged="false"] .liang-skin-portrait-stack {
-  opacity: 0.3;
-  transform: scale(1.035);
+  opacity: var(--liang-tune-idle-opacity, 0.3);
+  transform: scale(var(--liang-tune-idle-scale, 1.035));
+  --liang-corner-cut: var(--liang-tune-idle-cut, 30%);
+  --liang-corner-feather: var(--liang-tune-idle-feather, 26.7%);
 }
 
 /* Dragging the slider reveals the portrait completely. */
 .liang-skin-backdrop[data-preview="true"] .liang-skin-portrait-stack,
 .liang-skin-backdrop[data-preview="true"][data-engaged="true"] .liang-skin-portrait-stack {
-  opacity: 1;
-  transform: scale(1);
+  opacity: var(--liang-tune-preview-opacity, 1);
+  transform: scale(var(--liang-tune-preview-scale, 1));
+  --liang-corner-cut: var(--liang-tune-preview-cut, 10%);
+  --liang-corner-feather: var(--liang-tune-preview-feather, 40%);
   transition: opacity 260ms ease, transform 260ms ease;
 }
 
@@ -763,4 +769,126 @@ body[data-liang-skin="on"] .liang-effort-control__range::-webkit-slider-thumb {
   .liang-skin-portrait-stack {
     transition: none;
   }
+}
+
+
+/* --- Parameter tuner (temporary entry, hide when values settle) --- */
+.liang-tuner {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.liang-tuner__toggle {
+  width: 20px;
+  height: 20px;
+  margin-left: 4px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--liang-secondary, #888) 40%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--liang-layer-2, #222) 70%, transparent);
+  color: var(--liang-secondary, #aaa);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.liang-tuner__toggle[data-open="true"] {
+  color: var(--liang-accent, #d6a34e);
+  border-color: var(--liang-accent, #d6a34e);
+}
+
+.liang-tuner__panel {
+  position: fixed;
+  right: 24px;
+  bottom: 132px;
+  z-index: 2147483000;
+  width: 330px;
+  padding: 12px 14px;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 14px;
+  background: rgb(18 18 20 / 96%);
+  color: rgb(240 240 240 / 92%);
+  font-size: 12px;
+  line-height: 1.4;
+  box-shadow: 0 16px 48px rgb(0 0 0 / 55%);
+  backdrop-filter: blur(14px);
+}
+
+.liang-tuner__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.liang-tuner__head button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.liang-tuner__tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.liang-tuner__tabs button {
+  flex: 1;
+  padding: 4px 0;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.liang-tuner__tabs button[data-active="true"] {
+  border-color: var(--liang-accent, #d6a34e);
+  color: var(--liang-accent, #d6a34e);
+}
+
+.liang-tuner__section {
+  margin: 10px 0 4px;
+  color: rgb(255 255 255 / 55%);
+  font-size: 11px;
+}
+
+.liang-tuner__row {
+  display: grid;
+  grid-template-columns: 62px 1fr 38px;
+  align-items: center;
+  gap: 8px;
+  margin: 3px 0;
+}
+
+.liang-tuner__row input[type="range"] {
+  width: 100%;
+  accent-color: var(--liang-accent, #d6a34e);
+}
+
+.liang-tuner__row output {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: rgb(255 255 255 / 72%);
+}
+
+.liang-tuner__foot {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.liang-tuner__foot button {
+  flex: 1;
+  padding: 5px 0;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
 }

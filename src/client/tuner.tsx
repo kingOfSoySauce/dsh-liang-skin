@@ -43,7 +43,7 @@ export const TUNE_DEFAULTS: TuneValues = {
   running: { opacity: 0.85, scale: 1, cut: 20, feather: 40 },
   preview: { opacity: 1, scale: 1, cut: 10, feather: 40 },
   veil: { plateau: 72, a90: 0.9, a96: 0.7, edge: 0.12, ew: 46, eh: 80, cx: 75, cy: 36 },
-  image: { objectY: 36, width: 42, brightness: 1.2, contrast: 1.05, scrim: 0.3 },
+  image: { objectY: 36, width: 42, brightness: 1, contrast: 1, scrim: 0.3 },
   mask: { edgeX: 0, edgeY: 0, featherX: 32, featherY: 26 },
 };
 
@@ -102,7 +102,6 @@ export function applyTune(values: TuneValues) {
     stack.style.setProperty("--liang-corner-feather", `${current.feather}%`);
     stack.style.opacity = String(current.opacity);
     stack.style.transform = `scale(${current.scale})`;
-    stack.style.filter = `brightness(${values.image.brightness}) contrast(${values.image.contrast})`;
     const mask = values.mask;
     const edgeX = `rgb(0 0 0 / ${mask.edgeX})`;
     const edgeY = `rgb(0 0 0 / ${mask.edgeY})`;
@@ -353,9 +352,7 @@ export function LiangTuner({ onForce, liveState }: TunerProps) {
             {([
               ["垂直位置 %", values.image.objectY, 0, 100, 1, (v: number) => setImage({ objectY: v })],
               ["宽度 vw", values.image.width, 20, 70, 1, (v: number) => setImage({ width: v })],
-              ["亮度", values.image.brightness, 0.5, 2, 0.01, (v: number) => setImage({ brightness: v })],
-              ["对比度", values.image.contrast, 0.5, 2, 0.01, (v: number) => setImage({ contrast: v })],
-              ["背景压暗", values.image.scrim, 0, 1, 0.01, (v: number) => setImage({ scrim: v })],
+              ["背景压暗 0-3", values.image.scrim, 0, 3, 0.05, (v: number) => setImage({ scrim: v })],
             ] as const).map(([label, value, min, max, step, patch]) => (
               <label key={label} className="liang-tuner__row">
                 <span>{label}</span>

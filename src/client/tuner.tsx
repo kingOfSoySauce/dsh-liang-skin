@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export type TuneStateId = "idle" | "running" | "preview";
 
@@ -48,6 +48,16 @@ export const TUNE_DEFAULTS: TuneValues = {
 };
 
 const KEY = "dsh-liang-tune.v5";
+const POS_KEY = "dsh-liang-tune.pos";
+
+function loadPos(): { x: number; y: number } | null {
+  try {
+    const raw = localStorage.getItem(POS_KEY);
+    return raw === null ? null : (JSON.parse(raw) as { x: number; y: number });
+  } catch {
+    return null;
+  }
+}
 
 /** Push the tuned values onto the document as CSS variables. */
 export function applyTune(values: TuneValues) {
@@ -140,6 +150,19 @@ export function LiangTuner({ onForce, liveState }: TunerProps) {
   const [tab, setTab] = useState<TuneStateId>("idle");
   const [link, setLink] = useState(true);
   const [values, setValues] = useState<TuneValues>(loadTune);
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(loadPos);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ startX: number; startY: number; panelX: number; panelY: number } | null>(null);
+
+  useEffect(() => {
+    if (pos !== null) {
+      try {
+        localStorage.setItem(POS_KEY, JSON.stringify(pos));
+      } catch {
+        // Position is a convenience only.
+      }
+    }
+  }, [pos]);
 
   useEffect(() => {
     applyTune(values);
@@ -210,8 +233,35 @@ export function LiangTuner({ onForce, liveState }: TunerProps) {
         ⚙
       </button>
       {open && (
-        <div className="liang-tuner__panel" role="dialog" aria-label="背景人像参数">
-          <div className="liang-tuner__head">
+        <div
+          ref={panelRef}
+          className="liang-tuner__panel"
+          role="dialog"
+          aria-label="背景人像参数"
+          style={pos === null ? undefined : { left: pos.x, top: pos.y, bottom: "auto", transform: "none" }}
+        >
+          <div
+            className="liang-tuner__head"
+            style={{ cursor: "grab", touchAction: "none" }}
+            onPointerDown={(event) => {
+              if ((event.target as HTMLElement).closest("button") !== null) return;
+              const rect = panelRef.current?.getBoundingClientRect();
+              if (rect === undefined) return;
+              dragRef.current = { startX: event.clientX, startY: event.clientY, panelX: rect.left, panelY: rect.top };
+              event.currentTarget.setPointerCapture(event.pointerId);
+            }}
+            onPointerMove={(event) => {
+              if (dragRef.current === null) return;
+              const drag = dragRef.current;
+              const width = panelRef.current?.offsetWidth ?? 330;
+              const x = Math.max(0, Math.min(window.innerWidth - width, drag.panelX + event.clientX - drag.startX));
+              const y = Math.max(0, Math.min(window.innerHeight - 60, drag.panelY + event.clientY - drag.startY));
+              setPos({ x, y });
+            }}
+            onPointerUp={() => {
+              dragRef.current = null;
+            }}
+          >
             <strong>背景人像参数</strong>
             <button type="button" onClick={() => setOpen(false)} aria-label="关闭">×</button>
           </div>

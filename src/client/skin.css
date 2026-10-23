@@ -808,8 +808,11 @@ body[data-liang-skin="on"] .liang-effort-control__range::-webkit-slider-thumb {
 .liang-tuner__panel {
   position: fixed;
   left: 50%;
+  top: 24px;
   transform: translateX(-50%);
-  bottom: 132px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   z-index: 2147483000;
   width: 330px;
   padding: 12px 14px;

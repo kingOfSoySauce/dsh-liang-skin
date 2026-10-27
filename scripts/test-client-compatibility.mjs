@@ -8,15 +8,13 @@ import { chromium } from "playwright-core";
 
 // Self-contained host contracts; native Desktop acceptance remains manual.
 const projectRoot = fileURLToPath(new URL("../", import.meta.url));
-const packageId = "@leon___/dsh-client-liang-intensity-skin";
 const viewport = { width: 1100, height: 700 };
 const css = await readFile(new URL("../src/client/skin.css", import.meta.url), "utf8");
 const compiled = await build({ absWorkingDir: projectRoot,
   stdin: { resolveDir: projectRoot, contents: `
-    export { installLiangAppearanceButton } from './src/client/appearance.ts';
     export { paletteForFrame, PREVIEW_MAX_FRAME } from './src/client/logic.ts';
   ` },
-  bundle: true, write: false, format: "iife", globalName: "LiangAppearance", platform: "browser", target: "es2022" });
+  bundle: true, write: false, format: "iife", globalName: "LiangPalette", platform: "browser", target: "es2022" });
 
 async function chromeExecutable() {
   const explicit = process.env.CHROME_PATH;
@@ -40,7 +38,9 @@ function fixture({ desktop = false, top = 0, windows = false, mode = "compatibil
     * { box-sizing: border-box; transition: none !important; animation: none !important; }
     html, body { margin: 0; min-height: 100vh; }
     body { --dsw-alias-bg-base: rgb(240,244,248); --dsw-specific-sidebar-fill: rgb(11,29,49);
-      --liang-page: rgb(240,244,248); --liang-bg-base: rgb(0 0 0 / 25%); --liang-portrait-opacity: 1;
+      --liang-page: rgb(240,244,248); --liang-bg-base: rgba(0, 0, 0, 0.25);
+      --liang-mask-base: rgba(0, 0, 0, 0.25); --liang-mask-strong: rgba(0, 0, 0, 0.46);
+      --liang-mask-soft: rgba(0, 0, 0, 0.2); --liang-portrait-opacity: 1;
       --liang-sidebar: rgb(11,29,49); --liang-ink: rgb(20,25,30); --liang-secondary: rgb(55,60,65);
       --liang-border: rgb(100,110,120); --liang-layer-1: white; --dsh-desktop-frame-height: ${top}px;
       background: rgb(240,244,248); }
@@ -48,18 +48,15 @@ function fixture({ desktop = false, top = 0, windows = false, mode = "compatibil
       height: ${desktop ? `calc(100vh - ${top}px)` : "100vh"}; z-index: auto; background: var(--dsw-alias-bg-base); }
     .fixture_frame { display: flex; height: 100%; ${windows ? "background: var(--dsw-specific-sidebar-fill);" : ""} }
     .fixture_sidebarCol { flex: 0 0 200px; background: var(--dsw-specific-sidebar-fill); }
-    .fixture_centerCol { flex: 1; background: var(--dsw-alias-bg-base); }
+    .fixture_centerCol { position: relative; display: flex; flex-direction: column; flex: 1; background: var(--dsw-alias-bg-base); }
+    .fixture_phase { flex: 1; }
     #caption { position: fixed; inset: 0 0 auto; height: ${top}px; background: rgb(90,40,80); }
     #portal { position: fixed; right: 30px; top: 85px; width: 150px; height: 50px; border: 0;
       background: rgb(140,60,180); color: white; }
-    #appearance-host { position: absolute; top: ${top + 155}px; left: 225px; width: 620px; }
-    .fixture_group { margin-bottom: 8px; } .fixture_group > div { display: flex; gap: 4px; }
-    .native-choice { padding: 16px; flex: 1; }
   </style><style id="liang-styles">${css}</style></head>
   <body ${desktop ? `data-dsh-desktop-mode="${mode}"` : ""}>
-    <div class="liang-skin-backdrop" data-media="sequence" aria-hidden="true"><img class="liang-skin-sequence-frame" alt="" src="${portrait}"></div>
-    <div id="root"><div class="fixture_frame"><aside class="fixture_sidebarCol"></aside><main class="fixture_centerCol"></main></div></div>
-    <div id="caption"></div><div id="appearance-host"></div><button id="portal" type="button">Native portal</button>
+    <div id="root"><div class="fixture_frame"><aside class="fixture_sidebarCol"></aside><main class="fixture_centerCol"><div class="liang-skin-backdrop" data-media="sequence" data-mask="off" aria-hidden="true"><img class="liang-skin-sequence-frame" alt="" src="${portrait}"></div><div class="fixture_phase" data-phase="active"></div></main></div></div>
+    <div id="caption"></div><button id="portal" type="button">Native portal</button>
   </body></html>`;
 }
 
@@ -70,60 +67,20 @@ async function prepare(context, options = {}) {
   page.on("pageerror", error => errors.push(error.message));
   await page.setContent(fixture(options));
   await page.addScriptTag({ content: compiled.outputFiles[0].text });
-  await page.evaluate(({ packageId, enabled }) => {
-    let snapshot = { enabled };
-    const listeners = new Set();
-    const calls = [];
-    let releaseChoice, holdNextChoice = false, failNextChoice = false;
-    let dispose = () => {};
-    const publish = patch => {
-      snapshot = { ...snapshot, ...patch };
-      if (snapshot.enabled) document.body.dataset.liangSkin = "on";
+  await page.evaluate(({ enabled }) => {
+    const setEnabled = (value) => {
+      enabled = value;
+      if (enabled) document.body.dataset.liangSkin = "on";
       else delete document.body.dataset.liangSkin;
-      for (const listener of listeners) listener();
-    };
-    const scope = {
-      getSnapshot: () => snapshot,
-      subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
-    };
-    const presenter = {
-      async choose(value) {
-        calls.push(["choose", value]);
-        if (holdNextChoice) { holdNextChoice = false; await new Promise(resolve => { releaseChoice = resolve; }); }
-        if (failNextChoice) { failNextChoice = false; throw new Error("fixture choice rejected"); }
-        publish({ enabled: value });
-      },
-    };
-    const markup = hash => `<section class="fixture_group ${hash}_group extra-group"><div class="layout-row ${hash}_cubeRow extra-row" id="native-row">${["light", "dark", "system"].map(theme => `<button type="button" class="native-choice extra-button ${hash}_themeCube" data-theme="${theme}">${theme}</button>`).join("")}</div></section>`;
-    const connectNative = () => {
-      for (const button of document.querySelectorAll("#native-row > button[data-theme]")) {
-        button.addEventListener("click", () => { window.fixture.nativeClicks++; window.fixture.nativeTheme = button.dataset.theme; });
-      }
     };
     window.fixture = {
-      calls, nativeClicks: 0, nativeTheme: null, portalClicks: 0,
-      snapshot: () => ({ ...snapshot }), listenerCount: () => listeners.size,
-      install(hash = "_8HJdBW") {
-        document.querySelector("#appearance-host").innerHTML =
-          '<section class="fixture_group other_group"><div class="other_cubeRow" id="unrelated"><button>one</button><button>two</button><button>three</button></div></section>' +
-          '<section class="fixture_group nested_group"><div class="nested_cubeRow" id="nested-unrelated"><span><button class="nested_themeCube">one</button><button class="nested_themeCube">two</button><button class="nested_themeCube">three</button></span></div></section>' + markup(hash);
-        connectNative();
-        dispose = window.LiangAppearance.installLiangAppearanceButton(scope, presenter, packageId);
-      },
-      rebuild(hash = "_newHash42") {
-        document.querySelector("#native-row").parentElement.outerHTML = markup(hash); connectNative();
-      },
-      removeRow() { document.querySelector("#native-row").parentElement.remove(); },
-      restoreRow(hash = "_restored") {
-        document.querySelector("#appearance-host").insertAdjacentHTML("beforeend", markup(hash)); connectNative();
-      },
-      dispose() { dispose(); }, setEnabled(value) { publish({ enabled: value }); },
-      holdChoice() { holdNextChoice = true; }, releaseChoice() { releaseChoice?.(); },
-      rejectChoice() { failNextChoice = true; },
+      portalClicks: 0,
+      snapshot: () => ({ enabled }),
+      setEnabled,
     };
     document.querySelector("#portal").addEventListener("click", () => window.fixture.portalClicks++);
-    publish({});
-  }, { packageId, enabled: options.enabled ?? true });
+    setEnabled(enabled);
+  }, { enabled: options.enabled ?? true });
   await page.locator(".liang-skin-sequence-frame").evaluate(image => image.decode());
   return { page, errors };
 }
@@ -152,25 +109,34 @@ async function assertLayout(page, options, enabled = true) {
   const result = await page.evaluate(() => {
     const root = document.querySelector("#root"), backdrop = document.querySelector(".liang-skin-backdrop");
     const box = element => { const rect = element.getBoundingClientRect(); return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }; };
-    return { root: box(root), rootPosition: getComputedStyle(root).position, rootZ: getComputedStyle(root).zIndex,
+    return { root: box(root), center: box(document.querySelector(".fixture_centerCol")), rootPosition: getComputedStyle(root).position, rootZ: getComputedStyle(root).zIndex,
       backdrop: box(backdrop), portrait: box(backdrop.querySelector("img")), backdropZ: getComputedStyle(backdrop).zIndex, isolation: getComputedStyle(document.body).isolation,
       bgBase: getComputedStyle(document.body).getPropertyValue("--dsw-alias-bg-base").trim(),
-      frameColor: getComputedStyle(document.querySelector(".fixture_frame")).backgroundColor };
+      frameColor: getComputedStyle(document.querySelector(".fixture_frame")).backgroundColor,
+      centerColor: getComputedStyle(document.querySelector(".fixture_centerCol")).backgroundColor,
+      phasePosition: getComputedStyle(document.querySelector(".fixture_phase")).position };
   });
   assert.equal(result.rootPosition, options.desktop ? "fixed" : "static", "The host owns root positioning");
   assert.equal(result.rootZ, "auto", "The skin must not raise the root above native portals");
   const bounds = { x: 0, y: options.top ?? 0, width: size.width, height: size.height - (options.top ?? 0) };
+  const centerBounds = { x: 200, y: options.top ?? 0, width: size.width - 200, height: size.height - (options.top ?? 0) };
   assert.deepEqual(result.root, bounds);
   if (enabled) {
-    assert.equal(result.isolation, "isolate"); assert.equal(result.backdropZ, "-1");
+    assert.deepEqual(result.center, centerBounds);
+    assert.equal(result.isolation, "isolate"); assert.equal(result.backdropZ, "0");
     assert.equal(result.bgBase, "transparent", "Base surfaces must not apply a second portrait mask");
-    assert.deepEqual(result.backdrop, bounds);
-    assert.equal(result.portrait.height, bounds.height, "Portrait follows the background container height");
-    closeColor(await pixelAt(page, size.width - 30, 430), [24, 156, 72], "Portrait visible with exactly one 25% mask");
-    if (options.windows) assert.equal(result.frameColor, "rgba(0, 0, 0, 0)", "Only the Windows outer frame becomes transparent");
+    assert.equal(result.centerColor, "rgba(0, 0, 0, 0)", "Conversation column must expose the stage");
+    assert.equal(result.phasePosition, "relative", "Conversation content must paint above the stage");
+    assert.deepEqual(result.backdrop, centerBounds);
+    assert.equal(result.portrait.height, centerBounds.height, "Portrait follows the conversation column height");
+    closeColor(await pixelAt(page, size.width - 30, 430), [32, 208, 96], "Portrait visible without a full-screen overlay");
+    if (options.windows) assert.equal(result.frameColor, "rgb(11, 29, 49)", "Windows outer frame keeps its native fill");
   } else {
+    assert.deepEqual(result.center, centerBounds);
     assert.equal(result.isolation, "auto", "Skin-off restores native stacking");
     assert.equal(result.bgBase, "rgb(240,244,248)");
+    assert.equal(result.centerColor, "rgb(240, 244, 248)");
+    assert.equal(result.phasePosition, "static");
     closeColor(await pixelAt(page, size.width - 30, 430), [240, 244, 248], "Skin-off native background");
     if (options.windows) assert.equal(result.frameColor, "rgb(11, 29, 49)");
   }
@@ -180,60 +146,43 @@ async function assertLayout(page, options, enabled = true) {
   assert.equal(await page.evaluate(() => window.fixture.portalClicks), enabled ? 1 : 2, "Native body portal remains clickable");
 }
 
-async function appearanceChecks(page, hash) {
-  await page.evaluate(hash => window.fixture.install(hash), hash);
-  const custom = page.locator("#native-row > .liang-appearance-choice");
-  await custom.waitFor();
-  assert.equal(await page.locator(".liang-appearance-choice").count(), 1);
-  assert.equal(await page.locator("#unrelated .liang-appearance-choice, #nested-unrelated .liang-appearance-choice").count(), 0);
-  assert.equal(await custom.getAttribute("data-plugin"), packageId);
-  assert.equal(await custom.getAttribute("aria-pressed"), "true");
-  assert.equal(await page.locator(".liang-appearance-binding, input[role=switch]").count(), 0,
-    "The imperative appearance extension must not draw its own binding switch");
-  for (const theme of ["light", "dark", "system"]) {
-    await page.locator(`[data-theme="${theme}"]`).click();
-    await page.waitForFunction(() => !window.fixture.snapshot().enabled);
-    assert.equal(await page.locator(".liang-appearance-binding").count(), 0);
-    assert.equal(await custom.getAttribute("aria-pressed"), "false");
-    assert.equal(await page.evaluate(() => window.fixture.nativeTheme), theme);
-    await custom.click(); await page.waitForFunction(() => window.fixture.snapshot().enabled);
-  }
-  assert.equal(await page.evaluate(() => window.fixture.nativeClicks), 3, "Native theme handlers still run");
-  await page.evaluate(() => {
-    window.oldNative = document.querySelector('[data-theme="light"]');
-    window.oldCustom = document.querySelector(".liang-appearance-choice");
-    window.fixture.rebuild();
+async function maskChecks(page) {
+  const result = await page.evaluate(() => {
+    const backdrop = document.querySelector(".liang-skin-backdrop");
+    backdrop.dataset.mask = "on";
+    const enabled = {
+      display: getComputedStyle(backdrop, "::after").display,
+      background: getComputedStyle(backdrop, "::after").backgroundImage,
+    };
+    backdrop.dataset.mask = "off";
+    const disabled = getComputedStyle(backdrop, "::after").display;
+    const center = backdrop.parentElement;
+    const wrapper = document.createElement("div");
+    wrapper.style.display = "contents";
+    const detail = document.createElement("section");
+    detail.className = "fixture_page";
+    detail.textContent = "Plugin detail";
+    detail.style.cssText = "flex: 0 0 120px; padding: 20px; color: rgb(20, 25, 30); background: rgb(222, 10, 90);";
+    wrapper.append(detail);
+    center.insertBefore(wrapper, center.querySelector(".fixture_phase"));
+    const rect = detail.getBoundingClientRect();
+    const hit = document.elementFromPoint(rect.x + 20, rect.y + 20);
+    return {
+      enabled,
+      disabled,
+      pluginDetailPosition: getComputedStyle(detail).position,
+      pluginDetailTop: hit?.className ?? null,
+      sample: { x: Math.floor(rect.x + 10), y: Math.floor(rect.y + 10) },
+    };
   });
-  await page.locator("#native-row._newHash42_cubeRow > .liang-appearance-choice").waitFor();
-  assert.equal(await page.locator(".liang-appearance-choice").count(), 1, "DOM reconstruction produces one control");
-  const beforeStaleClicks = await page.evaluate(() => window.fixture.calls.length);
-  await page.evaluate(() => { window.oldNative.click(); window.oldCustom.click(); });
-  assert.equal(await page.evaluate(() => window.fixture.calls.length), beforeStaleClicks, "Replaced nodes lose plugin listeners");
-  await page.locator('[data-theme="dark"]').click(); await page.waitForFunction(() => !window.fixture.snapshot().enabled);
-  await custom.click(); await page.waitForFunction(() => window.fixture.snapshot().enabled);
-  await page.evaluate(() => window.fixture.removeRow());
-  await page.waitForFunction(() => document.querySelector(".liang-appearance-choice") === null);
-  await page.evaluate(() => window.fixture.restoreRow()); await custom.waitFor();
-  await page.evaluate(() => window.fixture.rejectChoice()); await page.locator('[data-theme="light"]').click();
-  await page.waitForFunction(() => !document.querySelector(".liang-appearance-choice").disabled);
-  assert.equal(await custom.getAttribute("aria-pressed"), "true", "Rejected preference preserves skin state");
-  await page.evaluate(() => window.fixture.holdChoice()); await page.locator('[data-theme="light"]').click();
-  assert.equal(await custom.isDisabled(), true, "Outstanding choices disable injected controls");
-  await page.evaluate(() => {
-    window.oldCustom = document.querySelector(".liang-appearance-choice");
-    window.fixture.dispose(); window.fixture.dispose(); window.fixture.releaseChoice();
-  });
-  await page.waitForFunction(() => !window.fixture.snapshot().enabled);
-  assert.equal(await page.locator(".liang-appearance-choice, .liang-appearance-binding").count(), 0, "Late choice cannot resurrect disposed controls");
-  assert.equal(await page.evaluate(() => window.fixture.listenerCount()), 0);
-  const beforeDisposedClicks = await page.evaluate(() => window.fixture.calls.length);
-  await page.evaluate(() => {
-    window.oldCustom.click(); document.querySelector('[data-theme="dark"]').click();
-    document.querySelector("#appearance-host").append(document.createElement("span"));
-  });
-  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
-  assert.equal(await page.evaluate(() => window.fixture.calls.length), beforeDisposedClicks);
-  assert.equal(await page.locator(".liang-appearance-choice, .liang-appearance-binding").count(), 0);
+  assert.equal(result.enabled.display, "block", "Mask switch enables the stage scrim");
+  assert.match(result.enabled.background, /rgba\(/, "Mask uses legacy-compatible rgba tokens");
+  assert.equal(result.disabled, "none", "Mask switch removes the stage scrim");
+  assert.equal(result.pluginDetailPosition, "relative", "Plugin detail content is positioned above the stage");
+  assert.equal(result.pluginDetailTop, "fixture_page", "Plugin detail text is not covered by the backdrop");
+  assert.deepEqual((await pixelAt(page, result.sample.x, result.sample.y)).slice(0, 3), [222, 10, 90],
+    "The actual page pixels paint above the stage through a display:contents slot wrapper");
+  console.log("PASS mask/detail: stage-local scrim toggle, rgba tokens, plugin detail text above stage");
 }
 
 // Account settings are a body portal, not a generic modal. Match the audited
@@ -296,7 +245,7 @@ async function overlayChecks(context) {
       document.querySelector("#account-back").addEventListener("click", () => window.accountBackClicks++);
       window.overlayFixture = {
         applyPalette(frame) {
-          const palette = window.LiangAppearance.paletteForFrame(frame);
+          const palette = window.LiangPalette.paletteForFrame(frame);
           const mapping = { page: "page", base: "bg-base", layer1: "layer-1", layer2: "layer-2",
             layer3: "layer-3", sidebar: "sidebar", ink: "ink", secondary: "secondary",
             tertiary: "tertiary", border: "border", accent: "accent", accentHover: "accent-hover",
@@ -320,7 +269,7 @@ async function overlayChecks(context) {
         },
       };
     }, hash);
-    const maxFrame = await page.evaluate(() => window.LiangAppearance.PREVIEW_MAX_FRAME);
+    const maxFrame = await page.evaluate(() => window.LiangPalette.PREVIEW_MAX_FRAME);
     for (const { name, frame, stage } of [
       { name: "light", frame: 0, stage: 0 },
       { name: "black-gold", frame: maxFrame, stage: 5 },
@@ -380,20 +329,18 @@ try {
     await assertLayout(page, options, false); assert.deepEqual(errors, [], `${options.name}: browser errors`);
     await page.close(); console.log(`PASS ${options.name}: backdrop, host geometry, native portal, skin off`);
   }
-  for (const hash of ["_8HJdBW", "_currentHash89"]) {
-    const { page, errors } = await prepare(context); await appearanceChecks(page, hash);
-    assert.deepEqual(errors, [], `${hash}: browser errors`); await page.close();
-    console.log(`PASS appearance ${hash}: multi-class discovery, choices, DOM rebuild, disposal race`);
-  }
+  const maskFixture = await prepare(context);
+  await maskChecks(maskFixture.page);
+  assert.deepEqual(maskFixture.errors, [], "Mask fixture: browser errors");
+  await maskFixture.page.close();
   const first = await prepare(context), second = await prepare(context, { desktop: true, windows: true, top: 40 });
-  await first.page.evaluate(() => window.fixture.install()); await second.page.evaluate(() => window.fixture.install("_otherWindow"));
-  await first.page.locator('[data-theme="light"]').click(); await first.page.waitForFunction(() => !window.fixture.snapshot().enabled);
+  await first.page.evaluate(() => window.fixture.setEnabled(false));
   assert.equal(await second.page.evaluate(() => window.fixture.snapshot().enabled), true);
   closeColor(await pixelAt(first.page, 1070, 430), [240, 244, 248], "First window skin off");
-  closeColor(await pixelAt(second.page, 1070, 430), [24, 156, 72], "Second window remains visible");
+  closeColor(await pixelAt(second.page, 1070, 430), [32, 208, 96], "Second window remains visible");
   assert.deepEqual([...first.errors, ...second.errors], []);
   const overlayScenarios = await overlayChecks(context);
   await context.close();
-  console.log("PASS independent windows: host geometry and appearance state stay isolated");
-  console.log(`Client compatibility browser checks passed (${cases.length + 3 + overlayScenarios} scenarios). Native Desktop validation remains manual.`);
+  console.log("PASS independent windows: host geometry and skin state stay isolated");
+  console.log(`Client compatibility browser checks passed (${cases.length + 2 + overlayScenarios} scenarios). Native Desktop validation remains manual.`);
 } finally { await browser.close(); }

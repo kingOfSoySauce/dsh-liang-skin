@@ -8,32 +8,17 @@ export const PACKAGE_ID = "dsh-client-liang-intensity-skin";
 export const SETTINGS_NAMESPACE = "liang-intensity-skin";
 export const ASSET_PREFIX = `/plugins/${PACKAGE_ID}/assets/`;
 
-const ASSET_SPECS = [
-  ["portrait-source-v2/stage-00.webp", "image/webp"],
-  ["portrait-source-v2/level-01.webp", "image/webp"],
-  ["portrait-source-v2/level-03.webp", "image/webp"],
-  ["portrait-source-v2/level-04.webp", "image/webp"],
-  ["portrait-source-v2/stage-06.webp", "image/webp"],
-  ["portrait-source-v2/level-07.webp", "image/webp"],
-  ["portrait-source-v2/level-09.webp", "image/webp"],
-  ["portrait-source-v2/level-10.webp", "image/webp"],
-  ["portrait-source-v2/stage-12.webp", "image/webp"],
-  ["portrait-source-v2/level-13.webp", "image/webp"],
-  ["portrait-source-v2/level-14.webp", "image/webp"],
-  ["portrait-source-v2/bridge-15.webp", "image/webp"],
-  ["portrait-source-v2/level-16.webp", "image/webp"],
-  ["portrait-source-v2/level-17.webp", "image/webp"],
-  ["portrait-source-v2/stage-18.webp", "image/webp"],
-  ["portrait-source-v2/level-19.webp", "image/webp"],
-  ["portrait-source-v2/level-21.webp", "image/webp"],
-  ["portrait-source-v2/level-22.webp", "image/webp"],
-  ["portrait-source-v2/stage-24.webp", "image/webp"],
-  ["portrait-source-v2/level-25.webp", "image/webp"],
-  ["portrait-source-v2/bridge-27.webp", "image/webp"],
-  ["portrait-source-v2/level-28.webp", "image/webp"],
-  ["portrait-source-v2/level-29.webp", "image/webp"],
-  ["portrait-source-v2/stage-30.webp", "image/webp"],
+const PORTRAIT_FILES = [
+  "stage-00.webp", "level-01.webp", "level-03.webp", "level-04.webp",
+  "stage-06.webp", "level-07.webp", "level-09.webp", "level-10.webp",
+  "stage-12.webp", "level-13.webp", "level-14.webp", "bridge-15.webp",
+  "level-16.webp", "level-17.webp", "stage-18.webp", "level-19.webp",
+  "level-21.webp", "level-22.webp", "stage-24.webp", "level-25.webp",
+  "bridge-27.webp", "level-28.webp", "level-29.webp", "stage-30.webp",
 ];
+const ASSET_SPECS = ["portrait-source-v2", "portrait-source-xianxia-v2"].flatMap(
+  (directory) => PORTRAIT_FILES.map((file) => [`${directory}/${file}`, "image/webp"]),
+);
 
 function send(res, status, headers = {}) {
   res.writeHead(status, {

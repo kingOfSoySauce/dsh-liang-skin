@@ -44,8 +44,21 @@ describe("滑动变祖 effort mapping", () => {
     expect(paletteForFrame(192)).toMatchObject({ stage: 5 });
     expect(paletteForFrame(239)).toMatchObject({ stage: 5 });
     expect(paletteForFrame(240)).toMatchObject({ stage: 5, strength: 1 });
-    expect(paletteForFrame(0).accent).toBe("rgb(65 118 230)");
-    expect(paletteForFrame(240).accent).toBe("rgb(193 154 73)");
+    expect(paletteForFrame(0).accent).toBe("rgb(65, 118, 230)");
+    expect(paletteForFrame(240).accent).toBe("rgb(193, 154, 73)");
+    expect(paletteForFrame(0)).toMatchObject({
+      maskBase: "rgba(232, 233, 229, 0.28)",
+      maskStrong: "rgba(232, 233, 229, 0.46)",
+      maskSoft: "rgba(232, 233, 229, 0.2)",
+      controlRail: "rgba(112, 116, 111, 0.28)",
+      controlBorder: "rgba(112, 116, 111, 0.72)",
+      controlFill: "rgb(218, 219, 216)",
+      layer1: "rgba(248, 248, 245, 0.58)",
+      layer2: "rgba(238, 239, 235, 0.6)",
+      layer3: "rgba(238, 239, 235, 0.7)",
+      sidebar: "rgba(234, 235, 231, 0.66)",
+      portraitOpacity: "1",
+    });
   });
 
   it("finds the nearest available portrait keys", () => {

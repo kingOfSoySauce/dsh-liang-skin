@@ -1,6 +1,8 @@
 .liang-skin-backdrop {
-  position: fixed;
-  z-index: -1;
+  /* The host conversation column is the containing block. Keeping the stage
+     inside that column avoids crossing the Windows frame stacking context. */
+  position: absolute;
+  z-index: 0;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
@@ -22,10 +24,11 @@ body[data-liang-skin="on"] .liang-skin-backdrop {
   height: 100%;
   object-fit: cover;
   object-position: 50% 42%;
-  opacity: var(--liang-portrait-opacity, 0.45);
+  opacity: var(--liang-portrait-opacity, 1);
   transform: translateY(-50%);
   filter: none;
-  mask-image: linear-gradient(90deg, transparent 0%, rgb(0 0 0 / 20%) 10%, black 30%, black 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.12) 6%, rgba(0, 0, 0, 0.55) 16%, black 34%, black 100%);
+  mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.12) 6%, rgba(0, 0, 0, 0.55) 16%, black 34%, black 100%);
   transition: filter 180ms linear;
 }
 
@@ -35,11 +38,28 @@ body[data-liang-skin="on"] .liang-skin-backdrop {
 
 .liang-skin-backdrop[data-media="sequence"] .liang-skin-sequence-frame {
   display: block;
-  opacity: var(--liang-portrait-opacity, 0.82);
+  opacity: var(--liang-portrait-opacity, 1);
 }
 
 .liang-skin-backdrop[data-media="color"] img {
   display: none;
+}
+
+.liang-skin-backdrop::after {
+  position: absolute;
+  inset: 0;
+  display: none;
+  content: "";
+  background:
+    linear-gradient(90deg, var(--liang-mask-strong, transparent) 0%, var(--liang-mask-soft, transparent) 38%, transparent 66%),
+    linear-gradient(var(--liang-mask-base, transparent), var(--liang-mask-base, transparent));
+}
+
+/* The scrim is stage-local: it desaturates the portrait without painting over
+   transcript text or native portals. The switch makes the two visual systems
+   directly comparable on a real WebView. */
+.liang-skin-backdrop[data-mask="on"]::after {
+  display: block;
 }
 
 body[data-liang-skin="on"] {
@@ -92,23 +112,23 @@ body[data-liang-skin="on"]:is(
   [data-liang-stage="2"],
   [data-liang-stage="3"]
 ) {
-  --dsw-alias-brand-primary-new-colorprimary-new-color: rgb(65 118 230) !important;
-  --dsw-alias-brand-primary: rgb(15 17 21) !important;
-  --dsw-alias-brand-text: rgb(15 17 21) !important;
-  --dsw-alias-button-primary-fill: rgb(15 17 21) !important;
-  --dsw-alias-button-primary-hover: rgb(53 54 56) !important;
-  --dsw-alias-button-info-fill: rgb(65 118 230) !important;
-  --dsw-alias-button-info-hover: rgb(103 158 254) !important;
-  --dsw-alias-state-business-primary: rgb(65 118 230) !important;
-  --dsw-alias-label-primary-inverted: rgb(249 250 251) !important;
-  --dsw-alias-button-elevated-fill: rgb(255 255 255) !important;
-  --dsw-alias-button-floating-fill: rgb(255 255 255) !important;
-  --dsw-alias-button-floating-hover: rgb(241 243 245) !important;
-  --dsw-alias-interactive-bg-hover-solid: rgb(241 243 245) !important;
-  --dsw-specific-bubble: rgb(237 243 254) !important;
-  --dsw-specific-input-major: rgb(255 255 255) !important;
-  --dsw-specific-menu: rgb(255 255 255) !important;
-  --dsw-specific-selector: rgb(245 246 247) !important;
+  --dsw-alias-brand-primary-new-colorprimary-new-color: rgb(65, 118, 230) !important;
+  --dsw-alias-brand-primary: rgb(15, 17, 21) !important;
+  --dsw-alias-brand-text: rgb(15, 17, 21) !important;
+  --dsw-alias-button-primary-fill: rgb(15, 17, 21) !important;
+  --dsw-alias-button-primary-hover: rgb(53, 54, 56) !important;
+  --dsw-alias-button-info-fill: rgb(65, 118, 230) !important;
+  --dsw-alias-button-info-hover: rgb(103, 158, 254) !important;
+  --dsw-alias-state-business-primary: rgb(65, 118, 230) !important;
+  --dsw-alias-label-primary-inverted: rgb(249, 250, 251) !important;
+  --dsw-alias-button-elevated-fill: rgb(255, 255, 255) !important;
+  --dsw-alias-button-floating-fill: rgb(255, 255, 255) !important;
+  --dsw-alias-button-floating-hover: rgb(241, 243, 245) !important;
+  --dsw-alias-interactive-bg-hover-solid: rgb(241, 243, 245) !important;
+  --dsw-specific-bubble: rgb(237, 243, 254) !important;
+  --dsw-specific-input-major: rgb(255, 255, 255) !important;
+  --dsw-specific-menu: rgb(255, 255, 255) !important;
+  --dsw-specific-selector: rgb(245, 246, 247) !important;
 }
 
 body[data-liang-skin="on"][data-liang-stage="5"] {
@@ -143,7 +163,7 @@ body[data-liang-skin="on"]:is(
   [data-liang-stage="2"],
   [data-liang-stage="3"]
 ) button[aria-label="新建会话"] svg[viewBox="0 0 182 24"] > rect[width="52"] {
-  fill: rgb(15 17 21) !important;
+  fill: rgb(15, 17, 21) !important;
 }
 
 body[data-liang-skin="on"]:is(
@@ -152,7 +172,7 @@ body[data-liang-skin="on"]:is(
   [data-liang-stage="2"],
   [data-liang-stage="3"]
 ) button[aria-label="新建会话"] svg[viewBox="0 0 182 24"] > g[clip-path*="badge"] path {
-  fill: rgb(249 250 251) !important;
+  fill: rgb(249, 250, 251) !important;
 }
 
 body[data-liang-skin="on"][data-liang-stage="5"] button[aria-label="新建会话"] svg[viewBox="0 0 182 24"] > rect[width="52"] {
@@ -200,8 +220,8 @@ body[data-liang-skin="on"]:is(
   [data-liang-stage="2"],
   [data-liang-stage="3"]
 ) button[aria-label="发送消息"]:disabled {
-  color: rgb(255 255 255 / 92%) !important;
-  background: rgb(65 118 230 / 42%) !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+  background: rgba(65, 118, 230, 0.42) !important;
   opacity: 1;
 }
 
@@ -209,11 +229,29 @@ body[data-liang-skin="on"] > #root {
   background: transparent !important;
 }
 
-body[data-liang-skin="on"]:is(
-  [data-dsh-desktop-mode="compatibility"],
-  [data-dsh-desktop-mode="extended"]
-) .liang-skin-backdrop {
-  top: var(--dsh-desktop-frame-height, 0px);
+/* The stage owns the center column's background. The ConversationRoot paints
+   after it in DOM order, while fixed native portals keep their page-level tier. */
+body[data-liang-skin="on"] #root [data-pane="conversation"],
+body[data-liang-skin="on"] #root [class*="centerCol"] {
+  position: relative;
+  background: transparent !important;
+}
+
+/* Every page rendered inside the center column must paint after the stage.
+   Plugin detail pages do not have [data-phase], so limiting this to the chat
+   transcript lets the z-index:0 stage cover their unpositioned text. No
+   z-index is introduced, so native fixed popups are not trapped here. */
+body[data-liang-skin="on"] #root [data-pane="conversation"] > :not(.liang-skin-backdrop),
+body[data-liang-skin="on"] #root [class*="centerCol"] > :not(.liang-skin-backdrop) {
+  position: relative;
+}
+
+/* The official Plugins page is a painted section inside a display:contents
+   slot wrapper. Positioning that wrapper cannot affect paint order. Position
+   the page box itself (without creating a stacking context) so its text stays
+   above the stage, just like its already-positioned native controls. */
+body[data-liang-skin="on"] #root :is([data-pane="conversation"], [class*="centerCol"]) > :is([style*="display: contents"], [style*="display:contents"]) > section[class$="_page"] {
+  position: relative;
 }
 
 /* Native account pages are full-screen body portals. Their header and loading
@@ -223,16 +261,9 @@ body[data-liang-skin="on"] > [role="dialog"][aria-modal="true"][class*="_overlay
   background: var(--liang-page, #fff) !important;
 }
 
-/* Windows paints the sidebar fill across the host frame, covering the portrait.
-   Match macOS's transparent frame while keeping the sidebar, caption, and
-   conversation surfaces painted by their own host rules. */
-html[data-windows-titlebar] body[data-liang-skin="on"] #root [class*="_frame"]:has(> [class*="_centerCol"]) {
-  background: transparent !important;
-}
-
 /* macOS adds different translucent sidebar materials for native light/dark.
    While Liang is active, the effort palette owns the sidebar fill. */
-html[data-platform="darwin"] body[data-liang-skin="on"] #root [class*="_frame"]:has(> [class*="_centerCol"]) > [class*="_sidebarCol"] {
+html[data-platform="darwin"] body[data-liang-skin="on"] #root [class*="sidebarCol"] {
   background: var(--liang-sidebar) !important;
 }
 
@@ -272,7 +303,7 @@ body[data-liang-skin="on"]:is(
   border-color: var(--liang-border) !important;
   color: var(--liang-ink) !important;
   background: var(--liang-layer-1) !important;
-  box-shadow: 0 8px 28px rgb(20 22 20 / 8%);
+  box-shadow: 0 8px 28px rgba(20, 22, 20, 0.08);
 }
 
 body[data-liang-skin="on"]:is(
@@ -297,7 +328,7 @@ body[data-liang-skin="on"]:is(
 
 .liang-effort-control {
   --liang-control-accent: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
-  --liang-control-rail: var(--dsw-alias-border-l3, rgb(0 0 0 / 16%));
+  --liang-control-rail: var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.16));
   position: relative;
   display: flex;
   width: 124px;
@@ -309,7 +340,6 @@ body[data-liang-skin="on"]:is(
 
 body[data-liang-skin="on"] .liang-effort-control {
   --liang-control-accent: var(--liang-secondary);
-  --liang-control-rail: color-mix(in srgb, var(--liang-secondary) 28%, transparent);
 }
 
 .liang-effort-control__ticks {
@@ -337,11 +367,11 @@ body[data-liang-skin="on"] .liang-effort-control {
   left: calc(10px + (100% - 20px) * var(--liang-slider-ratio));
   min-width: max-content;
   padding: 5px 8px;
-  border: 1px solid var(--liang-border, rgb(0 0 0 / 12%));
+  border: 1px solid var(--liang-border, rgba(0, 0, 0, 0.12));
   border-radius: 7px;
   color: var(--liang-ink, #171816);
   background: var(--liang-layer-1, #fff);
-  box-shadow: 0 5px 16px rgb(0 0 0 / 16%);
+  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.16);
   font-size: 11px;
   font-weight: 600;
   line-height: 16px;
@@ -399,19 +429,19 @@ body[data-liang-skin="on"] .liang-effort-control {
   width: 13px;
   height: 13px;
   margin-top: -6px;
-  border: 1.5px solid color-mix(in srgb, var(--liang-control-accent) 72%, transparent);
+  border: 1.5px solid var(--liang-control-border, var(--liang-control-accent));
   border-radius: 50%;
   appearance: none;
-  background: radial-gradient(circle, var(--liang-control-accent) 0 2px, color-mix(in srgb, var(--liang-control-accent) 22%, var(--dsw-alias-bg-layer-1, #fff)) 2.5px);
-  box-shadow: 0 1px 4px rgb(0 0 0 / 14%);
+  background: radial-gradient(circle, var(--liang-control-accent) 0 2px, var(--liang-control-fill, var(--dsw-alias-bg-layer-1, #fff)) 2.5px);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.14);
 }
 
 body[data-liang-skin="on"] .liang-effort-control__range::-webkit-slider-thumb {
   width: 13px;
   height: 13px;
   margin-top: -6px;
-  border-color: color-mix(in srgb, var(--liang-control-accent) 72%, transparent);
-  background: radial-gradient(circle, var(--liang-control-accent) 0 2px, color-mix(in srgb, var(--liang-control-accent) 22%, var(--liang-layer-1)) 2.5px);
+  border-color: var(--liang-control-border, var(--liang-control-accent));
+  background: radial-gradient(circle, var(--liang-control-accent) 0 2px, var(--liang-control-fill, var(--liang-layer-1, #fff)) 2.5px);
 }
 
 .liang-effort-control__range::-moz-range-track {
@@ -427,9 +457,9 @@ body[data-liang-skin="on"] .liang-effort-control__range::-webkit-slider-thumb {
 .liang-effort-control__range::-moz-range-thumb {
   width: 11px;
   height: 11px;
-  border: 1.5px solid color-mix(in srgb, var(--liang-control-accent) 72%, transparent);
+  border: 1.5px solid var(--liang-control-border, var(--liang-control-accent));
   border-radius: 50%;
-  background: color-mix(in srgb, var(--liang-control-accent) 24%, var(--dsw-alias-bg-layer-1, #fff));
+  background: var(--liang-control-fill, var(--dsw-alias-bg-layer-1, #fff));
 }
 
 .liang-effort-control__range:focus-visible {
@@ -440,71 +470,6 @@ body[data-liang-skin="on"] .liang-effort-control__range::-webkit-slider-thumb {
   --liang-control-accent: var(--dsw-alias-state-error-primary, #e43c3c);
 }
 
-.liang-appearance-choice {
-  box-sizing: border-box;
-  border: 1px solid var(--dsw-alias-border-l2);
-  flex: 180px;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 4px;
-  padding: 20px 32px;
-  border-radius: 16px;
-  font: inherit;
-  color: var(--dsw-alias-label-primary);
-  cursor: pointer;
-  background: transparent;
-  font-size: 14px;
-  line-height: 22px;
-  display: flex;
-}
-
-[class*="_cubeRow"]:has(.liang-appearance-choice) {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.liang-appearance-choice:hover:not([aria-pressed="true"]) {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-
-.liang-appearance-choice[aria-pressed="true"] {
-  border-color: var(--dsw-static-neutral-bluish-400);
-  background: var(--dsw-alias-bg-module-platform);
-}
-
-.liang-appearance-choice__icon {
-  display: block;
-  flex: 0 0 16px;
-  width: 16px;
-  height: 16px;
-  color: currentColor;
-  font-size: 16px;
-  line-height: 16px;
-}
-
-.liang-appearance-choice__label {
-  display: block;
-}
-
-/* Keep the host's three theme cubes untouched. These rules only style the
-   fourth button that is appended to the host cube row. */
-.liang-appearance-choice:disabled {
-  cursor: progress;
-  opacity: 0.7;
-}
-
-.liang-appearance-binding {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 16px 0;
-  border-bottom: 0.5px solid var(--dsw-alias-border-l2);
-  font-size: 14px;
-  line-height: 20px;
-}
-
 @media (max-width: 760px) {
   .liang-effort-control {
     width: 92px;
@@ -513,7 +478,7 @@ body[data-liang-skin="on"] .liang-effort-control__range::-webkit-slider-thumb {
   .liang-skin-backdrop img {
     right: -18vw;
     width: 92vw;
-    opacity: calc(var(--liang-portrait-opacity, 0.45) * 0.72);
+    opacity: 1;
   }
 
 }

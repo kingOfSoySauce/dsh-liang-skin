@@ -1,21 +1,34 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
   useSyncExternalStore,
 } from "react";
-import { Switch } from "@deepseek-ai/dsh-client-ui-primitives";
 import type { Context as ClientContext } from "@deepseek-ai/cordis";
 import type { SnapshotStore } from "@deepseek-ai/dsh-client-store";
 import type {} from "@deepseek-ai/dsh-client-ui-conversation/client";
 import type {} from "@deepseek-ai/dsh-client-ui-settings/client";
 import type {} from "@deepseek-ai/dsh-client-ui-model-selection/client";
+import type {} from "@deepseek-ai/dsh-client-ui-plugin-manager/client";
 import styles from "./skin.css";
-import { installLiangAppearanceButton } from "./appearance";
+import optionalVisuals from "./optional-visuals.css";
+import { createAmbient, type AmbientHandle } from "./ambient";
+import { createPortraitMotion, type PortraitMotionHandle } from "./motion";
+import { createPreferenceStore, type PreferenceStore } from "./preferences";
+import { SettingsPanel, SETTINGS_LOCALES, settingsStyles, type SettingsPanelProps } from "./settings-panel";
+import { createEffortSync } from "./effort-sync";
+import { createSkinUpdater, type PluginManagerLike } from "./updater";
+import { UPDATE_LOCALES, updateStyles } from "./update-controls";
+
+declare const __LIANG_VERSION__: string;
 import { createPortraitLoader } from "./portrait-loader";
 import {
   PREVIEW_MAX_FRAME,
+  MAX_LEVEL,
+  frameForLevel,
+  snapFrame,
   frameForEffort,
   indicatorLabel,
   nearestEffortIndex,
@@ -27,7 +40,19 @@ import {
 const PACKAGE_ID = "dsh-client-liang-intensity-skin";
 const LOCALE_NAMESPACE = "liang.skin";
 const ASSET_PREFIX = `/plugins/${PACKAGE_ID}/assets`;
-const BIND_EFFORT_KEY = "dsh-liang-intensity-skin.bind-effort";
+const BUNDLE_PACKAGE_ID = "@leon___/dsh-client-liang-intensity-skin";
+const CONVERSATION_COLUMN_SELECTORS = [
+  "[data-pane=\"conversation\"]",
+  "[class*=\"centerCol\"]",
+];
+
+function findConversationColumn(): HTMLElement | null {
+  for (const selector of CONVERSATION_COLUMN_SELECTORS) {
+    const column = document.querySelector<HTMLElement>(selector);
+    if (column !== null) return column;
+  }
+  return null;
+}
 
 const PORTRAIT_ANCHORS = [
   { level: 0, file: "stage-00.webp" },
@@ -55,26 +80,6 @@ const PORTRAIT_ANCHORS = [
   { level: 29, file: "level-29.webp" },
   { level: 30, file: "stage-30.webp" },
 ] as const;
-
-interface SkinSettings {
-  enabled: boolean;
-  bindEffort: boolean;
-}
-
-interface PreferenceStore {
-  getSnapshot(): SkinSettings;
-  subscribe(listener: () => void): () => void;
-  set(enabled: boolean): Promise<void>;
-  setBindEffort(enabled: boolean): Promise<void>;
-  dispose(): void;
-}
-
-type NativeThemeId = "light" | "dark";
-
-interface ThemeService {
-  getTheme(): { preference: string };
-  setTheme(id: NativeThemeId | "system"): void;
-}
 
 interface ModelSelection {
   provider: string;
@@ -109,17 +114,25 @@ interface SliderProps {
   select: (selection: ModelSelection) => Promise<boolean>;
   presenter: SkinPresenter;
   scope: PreferenceStore;
+  available: boolean;
+  session?: SessionLike;
 }
 
-interface EffortBindingRowProps {
-  scope: PreferenceStore;
-  t: (key: string) => string;
+interface SessionLike {
+  subscribe(listener: () => void): () => void;
+  getSnapshot(): { running?: boolean } | null;
 }
 
 const cssVariables = [
   "--liang-strength",
   "--liang-page",
   "--liang-bg-base",
+  "--liang-mask-base",
+  "--liang-mask-strong",
+  "--liang-mask-soft",
+  "--liang-control-rail",
+  "--liang-control-border",
+  "--liang-control-fill",
   "--liang-layer-1",
   "--liang-layer-2",
   "--liang-layer-3",
@@ -136,54 +149,141 @@ const cssVariables = [
 
 class SkinPresenter {
   private readonly scope: PreferenceStore;
-  private readonly theme: ThemeService;
   private readonly root: HTMLDivElement;
-  private readonly portraits: ReturnType<typeof createPortraitLoader>;
-  private enabled = true;
+  private portraits: ReturnType<typeof createPortraitLoader>;
+  private portraitSet = false;
+  private ambient: AmbientHandle | null = null;
+  private particleCanvas: HTMLCanvasElement | null = null;
+  private motion: PortraitMotionHandle | null = null;
+  private running = false;
+  private previewing = false;
+  private enabled = false;
   // Default to the max frame so the first paint after load is the dark shell;
   // starting at 0 flashed the light palette before the directory resolved.
   private frame = PREVIEW_MAX_FRAME;
   private pendingFrame = PREVIEW_MAX_FRAME;
   private raf = 0;
   private disposed = false;
+  private readonly placementObserver: MutationObserver;
   private unsubscribe: () => void;
 
-  constructor(scope: PreferenceStore, theme: ThemeService) {
+  constructor(scope: PreferenceStore) {
     this.scope = scope;
-    this.theme = theme;
     this.root = document.createElement("div");
     this.root.className = "liang-skin-backdrop";
     this.root.dataset.plugin = PACKAGE_ID;
     this.root.dataset.media = "color";
     this.root.setAttribute("aria-hidden", "true");
-    this.portraits = createPortraitLoader({
-      sources: PORTRAIT_ANCHORS.map(({ level, file }) => ({
-        level,
-        url: `${ASSET_PREFIX}/portrait-source-v2/${file}`,
-      })),
-      onChange: ({ image }) => {
-        if (this.disposed || !this.enabled) return;
-        if (image === null) {
-          this.root.dataset.media = "color";
-          this.root.replaceChildren();
-          return;
-        }
-        // Reuse the decoded node so a frame swap cannot start a second fetch.
-        const portrait = image as HTMLImageElement;
-        portrait.className = "liang-skin-sequence-frame";
-        portrait.alt = "";
-        portrait.draggable = false;
-        if (this.root.firstChild !== portrait) this.root.replaceChildren(portrait);
-        this.root.dataset.media = "sequence";
-      },
+    this.placementObserver = new MutationObserver(() => {
+      if (this.enabled) this.mountBackdrop();
     });
+    this.placementObserver.observe(document.body, { childList: true, subtree: true });
+    this.portraits = this.createPortraits(false);
 
     this.unsubscribe = scope.subscribe(() => this.syncSettings());
     this.syncSettings();
   }
 
+  private mountBackdrop() {
+    const column = findConversationColumn();
+    if (column === null) return false;
+    if (this.root.parentElement !== column) column.insertBefore(this.root, column.firstChild);
+    return true;
+  }
+
+  private createPortraits(xianxia: boolean) {
+    this.root.dataset.portraitSet = xianxia ? "xianxia" : "original";
+    return createPortraitLoader({
+      sources: PORTRAIT_ANCHORS.map(({ level, file }) => ({
+        level,
+        url: `${ASSET_PREFIX}/${xianxia ? "portrait-source-xianxia-v2" : "portrait-source-v2"}/${file}`,
+      })),
+      onChange: ({ image }) => {
+        if (this.disposed || !this.enabled) return;
+        if (image === null) {
+          this.root.dataset.media = "color";
+          for (const node of this.root.querySelectorAll("img")) node.remove();
+          return;
+        }
+        const portrait = image as HTMLImageElement;
+        portrait.className = "liang-skin-sequence-frame";
+        portrait.alt = "";
+        portrait.draggable = false;
+        if (this.root.querySelector("img") !== portrait) {
+          for (const node of this.root.querySelectorAll("img")) node.remove();
+          this.root.prepend(portrait);
+        }
+        this.root.dataset.media = "sequence";
+        this.syncParticleAnchors();
+      },
+    });
+  }
+
   private syncSettings() {
-    this.setEnabled(this.scope.getSnapshot().enabled);
+    const settings = this.scope.getSnapshot();
+    if (this.portraitSet !== settings.xianxiaPortraits) {
+      this.portraits.dispose();
+      for (const node of this.root.querySelectorAll("img")) node.remove();
+      this.root.dataset.media = "color";
+      this.portraitSet = settings.xianxiaPortraits;
+      this.portraits = this.createPortraits(this.portraitSet);
+      this.portraits.select(paletteForFrame(this.frame).level);
+      if (this.enabled && settings.enabled) this.portraits.start();
+    }
+    this.setMaskEnabled(settings.maskEnabled);
+    this.setEnabled(settings.enabled);
+    this.syncOptionalEffects();
+  }
+
+  private syncOptionalEffects() {
+    const settings = this.scope.getSnapshot();
+    if (this.enabled && settings.motionEnabled) {
+      this.motion ??= createPortraitMotion(this.root);
+      this.motion.setRunning(this.running);
+      this.motion.setPreviewing(this.previewing);
+    } else {
+      this.motion?.dispose();
+      this.motion = null;
+    }
+    if (this.enabled && settings.particlesEnabled) {
+      if (this.ambient === null) {
+        this.particleCanvas = document.createElement("canvas");
+        this.particleCanvas.className = "liang-ambient";
+        this.particleCanvas.setAttribute("aria-hidden", "true");
+        this.root.append(this.particleCanvas);
+        this.ambient = createAmbient(this.particleCanvas);
+        window.addEventListener("resize", this.syncParticleAnchors);
+        const palette = paletteForFrame(this.frame);
+        this.ambient.setLevel(palette.level, palette.stage === 5);
+        this.syncParticleAnchors();
+        this.ambient.start();
+      }
+    } else {
+      this.ambient?.dispose();
+      this.ambient = null;
+      this.particleCanvas?.remove();
+      this.particleCanvas = null;
+      window.removeEventListener("resize", this.syncParticleAnchors);
+    }
+  }
+
+  private readonly syncParticleAnchors = () => {
+    if (this.ambient === null) return;
+    const bounds = this.root.getBoundingClientRect();
+    const input = this.root.parentElement?.querySelector(".liang-effort-control")?.getBoundingClientRect();
+    const image = this.root.querySelector("img")?.getBoundingClientRect();
+    this.ambient.setAnchor(input?.right ?? bounds.left + bounds.width * 0.6, input ? input.top + input.height / 2 : bounds.top + bounds.height * 0.7);
+    this.ambient.setTarget(image ? image.left + image.width * 0.55 : bounds.right - bounds.width * 0.18, image ? image.top + image.height * 0.3 : bounds.top + bounds.height * 0.3);
+  };
+
+  setRunning(running: boolean) {
+    this.running = running;
+    this.motion?.setRunning(running);
+  }
+
+  setPreviewing(previewing: boolean) {
+    this.previewing = previewing;
+    this.motion?.setPreviewing(previewing);
   }
 
   isEnabled() {
@@ -195,10 +295,10 @@ class SkinPresenter {
   }
 
   setEnabled(enabled: boolean) {
-    if (this.disposed) return;
+    if (this.disposed || this.enabled === enabled) return;
     this.enabled = enabled;
     if (enabled) {
-      if (!this.root.isConnected) document.body.prepend(this.root);
+      this.mountBackdrop();
       document.body.dataset.liangSkin = "on";
       this.applyFrame();
       this.portraits.start();
@@ -207,12 +307,18 @@ class SkinPresenter {
       this.raf = 0;
       this.root.remove();
       this.portraits.stop();
-      this.root.replaceChildren();
+      for (const node of this.root.querySelectorAll("img")) node.remove();
       this.root.dataset.media = "color";
       delete document.body.dataset.liangSkin;
       delete document.body.dataset.liangStage;
       for (const name of cssVariables) document.body.style.removeProperty(name);
     }
+    this.syncOptionalEffects();
+  }
+
+  setMaskEnabled(enabled: boolean) {
+    if (this.disposed) return;
+    this.root.dataset.mask = enabled ? "on" : "off";
   }
 
   setFrame(frame: number) {
@@ -232,11 +338,16 @@ class SkinPresenter {
     if (this.disposed || !this.enabled) return;
     const palette = paletteForFrame(this.frame);
     const body = document.body;
-    this.syncNativeTheme(palette.stage === 5 ? "dark" : "light");
     body.dataset.liangStage = String(palette.stage);
     body.style.setProperty("--liang-strength", String(palette.strength));
     body.style.setProperty("--liang-page", palette.page);
     body.style.setProperty("--liang-bg-base", palette.base);
+    body.style.setProperty("--liang-mask-base", palette.maskBase);
+    body.style.setProperty("--liang-mask-strong", palette.maskStrong);
+    body.style.setProperty("--liang-mask-soft", palette.maskSoft);
+    body.style.setProperty("--liang-control-rail", palette.controlRail);
+    body.style.setProperty("--liang-control-border", palette.controlBorder);
+    body.style.setProperty("--liang-control-fill", palette.controlFill);
     body.style.setProperty("--liang-layer-1", palette.layer1);
     body.style.setProperty("--liang-layer-2", palette.layer2);
     body.style.setProperty("--liang-layer-3", palette.layer3);
@@ -250,11 +361,8 @@ class SkinPresenter {
     body.style.setProperty("--liang-hover", palette.hover);
     body.style.setProperty("--liang-portrait-opacity", palette.portraitOpacity);
     this.updatePortrait(palette.level);
-  }
-
-  syncNativeTheme(theme: NativeThemeId = paletteForFrame(this.frame).stage === 5 ? "dark" : "light") {
-    if (!this.enabled || this.theme.getTheme().preference === theme) return;
-    this.theme.setTheme(theme);
+    this.ambient?.setLevel(palette.level, palette.stage === 5);
+    this.syncParticleAnchors();
   }
 
   private updatePortrait(level: number) {
@@ -275,8 +383,15 @@ class SkinPresenter {
     if (this.disposed) return;
     this.disposed = true;
     this.unsubscribe();
+    this.placementObserver.disconnect();
     if (this.raf !== 0) cancelAnimationFrame(this.raf);
     this.portraits.dispose();
+    this.motion?.dispose();
+    this.ambient?.dispose();
+    window.removeEventListener("resize", this.syncParticleAnchors);
+    this.particleCanvas?.remove();
+    this.motion = null;
+    this.ambient = null;
     this.root.remove();
     document.body.removeAttribute("data-liang-skin");
     delete document.body.dataset.liangStage;
@@ -297,7 +412,14 @@ function modelReasoning(state: ModelDirectoryState) {
   };
 }
 
-function LiangEffortSlider({ directory, load, select, presenter, scope }: SliderProps) {
+function useSessionRunning(session: SessionLike | undefined) {
+  return useSyncExternalStore(
+    (listener) => session?.subscribe(listener) ?? (() => {}),
+    () => session?.getSnapshot()?.running === true,
+  );
+}
+
+function LiangEffortSlider({ directory, load, select, presenter, scope, available, session }: SliderProps) {
   const state = useSyncExternalStore(
     (listener) => directory.subscribe(listener),
     () => directory.getSnapshot(),
@@ -316,35 +438,81 @@ function LiangEffortSlider({ directory, load, select, presenter, scope }: Slider
   // An unknown committed effort defaults to the max frame: a fresh
   // conversation paints the dark shell immediately instead of flashing the
   // light palette until the directory load resolves the real effort.
-  const committedFrame = committedIndex < 0
+  const effortFrame = committedIndex < 0
     ? PREVIEW_MAX_FRAME
     : frameForEffort(committedIndex, efforts.length);
   const bindEffort = skin.bindEffort;
+  const fine = bindEffort && skin.fineStopsEnabled;
+  const committedFrame = fine ? snapFrame(effortFrame) : effortFrame;
+  const modelKey = JSON.stringify([reasoning?.selection.provider, reasoning?.selection.model, efforts.map((effort) => effort.id)]);
+  const selectionKey = JSON.stringify([modelKey, efforts[committedIndex]?.id ?? null]);
+  const modeKey = JSON.stringify([modelKey, bindEffort, fine]);
+  const sync = useRef(createEffortSync());
+  const latest = useRef({ modelKey, committedFrame });
+  latest.current = { modelKey, committedFrame };
+  const running = useSessionRunning(session);
   const [frame, setFrame] = useState(() => bindEffort ? committedFrame : presenter.getFrame());
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
   const [interacting, setInteracting] = useState(false);
   const dragging = useRef(false);
   const dragStartFrame = useRef(frame);
-  const enabled = skin.enabled;
+  const dragStartSelection = useRef(selectionKey);
+  const enabled = skin.enabled && available;
+
+  const cancelInteraction = useCallback(() => {
+    setInteracting(false);
+    presenter.setPreviewing(false);
+    dragging.current = false;
+    const externalChange = bindEffort && dragStartSelection.current !== selectionKey;
+    if (externalChange) {
+      sync.current.reset();
+      sync.current.observe({ key: selectionKey, mode: modeKey, frame: committedFrame, fine });
+    }
+    const restored = externalChange ? committedFrame : dragStartFrame.current;
+    setFrame(restored);
+    presenter.setFrame(restored);
+  }, [bindEffort, selectionKey, modeKey, committedFrame, fine, presenter]);
+
+  useEffect(() => {
+    if (!skin.hideSlider) return;
+    if (dragging.current) cancelInteraction();
+    else {
+      setInteracting(false);
+      presenter.setPreviewing(false);
+    }
+    // Hiding never cancels a submitted model selection or its acknowledgement.
+  }, [skin.hideSlider, cancelInteraction, presenter]);
 
   useEffect(() => {
     if (enabled) load();
   }, [enabled, load]);
 
   useEffect(() => {
-    if (!bindEffort || dragging.current || pending) return;
-    setFrame(committedFrame);
-    presenter.setFrame(committedFrame);
-  }, [bindEffort, committedFrame, pending, presenter]);
+    if (!available) return;
+    presenter.setRunning(running);
+    return () => presenter.setRunning(false);
+  }, [presenter, running, available]);
 
-  if (!enabled) return null;
+  useEffect(() => available ? () => presenter.setPreviewing(false) : undefined, [presenter, available]);
+
+  useEffect(() => {
+    if (!enabled || !bindEffort || dragging.current || pending || state.status === "selecting") return;
+    const next = sync.current.observe({ key: selectionKey, mode: modeKey, frame: committedFrame, fine });
+    if (next === null) return;
+    setFrame(next);
+    presenter.setFrame(next);
+  }, [enabled, bindEffort, committedFrame, selectionKey, modeKey, fine, pending, presenter, state.status]);
+
+  if (!enabled || skin.hideSlider) return null;
   if (bindEffort && (reasoning === null || efforts.length < 2)) return null;
 
   const previewIndex = nearestEffortIndex(frame, efforts);
   const previewEffort = efforts[previewIndex];
   const progressRatio = frame / PREVIEW_MAX_FRAME;
-  const tooltipLabel = indicatorLabel(frame, bindEffort ? efforts : []);
+  const tooltipLabel = indicatorLabel(frame, bindEffort ? efforts : [], { withLevel: fine });
+
+
 
   const commit = async (rawFrame: number) => {
     if (!bindEffort) {
@@ -353,14 +521,16 @@ function LiangEffortSlider({ directory, load, select, presenter, scope }: Slider
       presenter.setFrame(rawFrame);
       return;
     }
-    const targetIndex = nearestEffortIndex(rawFrame, efforts);
+    const fineFrame = fine ? snapFrame(rawFrame) : rawFrame;
+    const targetIndex = nearestEffortIndex(fineFrame, efforts);
     const target = efforts[targetIndex];
     if (target === undefined) return;
-    const targetFrame = frameForEffort(targetIndex, efforts.length);
+    const targetFrame = fine ? fineFrame : frameForEffort(targetIndex, efforts.length);
     dragging.current = false;
     setFrame(targetFrame);
     presenter.setFrame(targetFrame);
     if (targetIndex === committedIndex || pending) return;
+    if (fine) sync.current.submit(JSON.stringify([modelKey, target.id]), selectionKey, modeKey);
     setPending(true);
     setFailed(false);
     const accepted = await select({
@@ -370,9 +540,10 @@ function LiangEffortSlider({ directory, load, select, presenter, scope }: Slider
     });
     setPending(false);
     if (!accepted) {
+      sync.current.reset();
       setFailed(true);
-      setFrame(committedFrame);
-      presenter.setFrame(committedFrame);
+      setFrame(latest.current.committedFrame);
+      presenter.setFrame(latest.current.committedFrame);
     }
   };
 
@@ -392,6 +563,10 @@ function LiangEffortSlider({ directory, load, select, presenter, scope }: Slider
         </output>
       )}
       <div className="liang-effort-control__ticks" aria-hidden="true">
+        {fine && Array.from({ length: MAX_LEVEL + 1 }, (_, level) => (
+          <i className="liang-effort-control__tick liang-effort-control__tick--minor" key={`fine-${level}`}
+            style={{ left: `${(frameForLevel(level) / PREVIEW_MAX_FRAME) * 100}%` }} />
+        ))}
         {efforts.map((effort, index) => (
           <i
             className="liang-effort-control__tick"
@@ -405,7 +580,7 @@ function LiangEffortSlider({ directory, load, select, presenter, scope }: Slider
         type="range"
         min={0}
         max={PREVIEW_MAX_FRAME}
-        step={1}
+        step={fine ? PREVIEW_MAX_FRAME / MAX_LEVEL : 1}
         value={frame}
         disabled={pending || state.status === "selecting"}
         aria-label={bindEffort ? "思考等级" : "皮肤进度"}
@@ -413,7 +588,9 @@ function LiangEffortSlider({ directory, load, select, presenter, scope }: Slider
         onPointerDown={() => {
           dragging.current = true;
           dragStartFrame.current = frame;
+          dragStartSelection.current = selectionKey;
           setInteracting(true);
+          presenter.setPreviewing(true);
         }}
         onInput={(event) => {
           dragging.current = true;
@@ -423,29 +600,30 @@ function LiangEffortSlider({ directory, load, select, presenter, scope }: Slider
         }}
         onPointerUp={(event) => {
           setInteracting(false);
+          presenter.setPreviewing(false);
           void commit(Number(event.currentTarget.value));
         }}
-        onPointerCancel={() => {
-          setInteracting(false);
-          dragging.current = false;
-          setFrame(dragStartFrame.current);
-          presenter.setFrame(dragStartFrame.current);
-        }}
+        onPointerCancel={cancelInteraction}
         onKeyUp={(event) => {
           setInteracting(false);
+          presenter.setPreviewing(false);
           if (event.key !== "Escape") void commit(Number(event.currentTarget.value));
         }}
         onBlur={(event) => {
           setInteracting(false);
+          presenter.setPreviewing(false);
           if (dragging.current) void commit(Number(event.currentTarget.value));
         }}
         onKeyDown={(event) => {
+          if (!dragging.current) {
+            dragStartFrame.current = frame;
+            dragStartSelection.current = selectionKey;
+          }
           setInteracting(true);
+          presenter.setPreviewing(true);
           if (event.key === "Escape" && !pending) {
-            setInteracting(false);
-            dragging.current = false;
-            setFrame(dragStartFrame.current);
-            presenter.setFrame(dragStartFrame.current);
+            event.preventDefault();
+            cancelInteraction();
           }
         }}
       />
@@ -453,28 +631,12 @@ function LiangEffortSlider({ directory, load, select, presenter, scope }: Slider
   );
 }
 
-function EffortBindingRow({ scope, t }: EffortBindingRowProps) {
-  const snapshot = useSyncExternalStore(
-    (listener) => scope.subscribe(listener),
-    () => scope.getSnapshot(),
-  );
-  const [pending, setPending] = useState(false);
-  if (!snapshot.enabled) return null;
-
+function LiangSettingsPage(props: SettingsPanelProps) {
   return (
-    <div className="liang-appearance-binding" data-plugin={PACKAGE_ID}>
-      <span>{t("effort.binding")}</span>
-      <Switch
-        checked={snapshot.bindEffort}
-        disabled={pending}
-        label={t("effort.binding")}
-        onChange={(next) => {
-          if (pending) return;
-          setPending(true);
-          void scope.setBindEffort(next).catch(() => undefined).finally(() => setPending(false));
-        }}
-      />
-    </div>
+    <section className="liang-settings-page">
+      <h2 className="liang-settings-page__title">{props.t("settings.title")}</h2>
+      <SettingsPanel {...props} />
+    </section>
   );
 }
 
@@ -483,87 +645,54 @@ export const inject = [
   "sessions",
   "modelDirectories",
   "locale",
-  "theme",
 ];
-
-function createPreferenceStore(): PreferenceStore {
-  // The market's active skin is the source of truth for whether this client
-  // should be visible. The appearance switch is therefore scoped to this
-  // client activation and must not survive switching away and back.
-  try {
-    localStorage.removeItem("dsh-liang-intensity-skin.enabled");
-  } catch {
-    // Storage may be unavailable; the in-memory default still enables Liang.
-  }
-  let snapshot: SkinSettings = {
-    enabled: true,
-    bindEffort: localStorage.getItem(BIND_EFFORT_KEY) !== "0",
-  };
-  const listeners = new Set<() => void>();
-  const onStorage = (event: StorageEvent) => {
-    if (event.key !== BIND_EFFORT_KEY) return;
-    const next = {
-      enabled: snapshot.enabled,
-      bindEffort: event.newValue !== "0",
-    };
-    if (next.enabled === snapshot.enabled && next.bindEffort === snapshot.bindEffort) return;
-    snapshot = next;
-    for (const listener of listeners) listener();
-  };
-  window.addEventListener("storage", onStorage);
-  return {
-    getSnapshot: () => snapshot,
-    subscribe(listener) {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
-    async set(enabled) {
-      if (enabled === snapshot.enabled) return;
-      snapshot = { ...snapshot, enabled };
-      for (const listener of listeners) listener();
-    },
-    async setBindEffort(bindEffort) {
-      if (bindEffort === snapshot.bindEffort) return;
-      localStorage.setItem(BIND_EFFORT_KEY, bindEffort ? "1" : "0");
-      snapshot = { ...snapshot, bindEffort };
-      for (const listener of listeners) listener();
-    },
-    dispose() {
-      window.removeEventListener("storage", onStorage);
-      listeners.clear();
-    },
-  };
-}
 
 export function apply(ctx: ClientContext) {
   const style = document.createElement("style");
   style.dataset.plugin = PACKAGE_ID;
-  style.textContent = styles;
+  style.textContent = [styles, optionalVisuals, settingsStyles, updateStyles].join("\n");
   document.head.append(style);
   ctx.effect(() => () => style.remove(), "liang-intensity-skin: scoped styles");
 
   const scope = createPreferenceStore();
   ctx.effect(() => () => scope.dispose(), "liang-intensity-skin: appearance preference");
-  const theme = ctx.get("theme") as ThemeService;
-  const presenter = new SkinPresenter(scope, theme);
+  const updater = createSkinUpdater({
+    loadedVersion: __LIANG_VERSION__,
+    manager: () => {
+      try {
+        return (ctx.get("remote") as { pluginManager?: PluginManagerLike } | undefined)?.pluginManager;
+      } catch { return undefined; }
+    },
+  });
+  ctx.effect(() => () => updater.dispose(), "liang-intensity-skin: update state");
+  const presenter = new SkinPresenter(scope);
   ctx.effect(() => () => presenter.dispose(), "liang-intensity-skin: backdrop presenter");
   ctx.effect(
-    () => installLiangAppearanceButton(scope, presenter, PACKAGE_ID),
-    "liang-intensity-skin: native appearance extension",
-  );
-  ctx.effect(
     () => ctx.locale.register(LOCALE_NAMESPACE, {
-      zh: { "effort.binding": "滑动变祖绑定思考等级" },
-      en: { "effort.binding": "Bind slider to reasoning level" },
-    }), "liang-intensity-skin: settings locale");
+      zh: { ...SETTINGS_LOCALES.zh, ...UPDATE_LOCALES.zh },
+      en: { ...SETTINGS_LOCALES.en, ...UPDATE_LOCALES.en },
+    }),
+    "liang-intensity-skin: settings locale",
+  );
 
-  ctx.slots.inject("settings.general.item", () => ctx.slots.register({
-    name: "settings.general.item",
-    id: "liang-effort-binding",
-    order: 10.5,
+  // The official Plugins page owns this slot. inject waits for it without
+  // making plugin-page services mandatory for the skin on older hosts.
+  ctx.slots.inject("plugins.bundle.config", () => ctx.slots.register({
+    name: "plugins.bundle.config",
+    key: BUNDLE_PACKAGE_ID,
     locale: LOCALE_NAMESPACE,
-    inject: () => ({ scope }),
-  }, EffortBindingRow));
+    inject: () => ({ scope, updater }),
+  }, SettingsPanel));
+
+  const settingsTitle = ctx.locale.bind(LOCALE_NAMESPACE);
+  ctx.slots.inject("settings.section", () => ctx.slots.register({
+    name: "settings.section",
+    id: "liang-skin-settings",
+    order: 46,
+    label: () => settingsTitle("settings.title"),
+    locale: LOCALE_NAMESPACE,
+    inject: () => ({ scope, updater }),
+  }, LiangSettingsPage));
 
   ctx.slots.inject("conversation.input.right", () => ctx.slots.register({
     name: "conversation.input.right",
@@ -572,7 +701,15 @@ export function apply(ctx: ClientContext) {
     inject: (sessionId: string) => {
       const available = ctx.sessions.subagentAddress(sessionId) === undefined;
       const directory = ctx.modelDirectories.directoryFor(sessionId) as ModelDirectory;
+      const sessions = ctx.sessions as unknown as {
+        scope?: (id: string) => unknown;
+        sessionOf?: (scope: unknown) => SessionLike;
+      };
+      const sessionScope = sessions.scope?.(sessionId);
+      const session = sessionScope === undefined ? undefined : sessions.sessionOf?.(sessionScope);
       return {
+        available,
+        session,
         directory: directory.store,
         presenter,
         scope,

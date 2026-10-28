@@ -1,0 +1,32 @@
+/* These rules become active only when the corresponding optional feature is
+   instantiated. The original portrait rules remain the default. */
+.liang-effort-control__tick--minor {
+  height: 3px;
+  opacity: 0.38;
+}
+
+.liang-skin-backdrop[data-motion="on"][data-media="sequence"] .liang-skin-sequence-frame {
+  opacity: calc(var(--liang-portrait-opacity, 1) * var(--liang-motion-opacity, 1));
+  transform: translateY(-50%) scale(var(--liang-motion-scale, 1));
+  transform-origin: 50% 42%;
+  transition: opacity 1400ms ease, transform 1400ms ease, filter 180ms linear;
+}
+
+.liang-skin-backdrop[data-motion="on"][data-motion-state="preview"] .liang-skin-sequence-frame {
+  transition-duration: 260ms;
+}
+
+.liang-ambient {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liang-skin-backdrop[data-motion="on"] .liang-skin-sequence-frame {
+    transition: none;
+  }
+}

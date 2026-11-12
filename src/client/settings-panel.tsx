@@ -28,6 +28,8 @@ export const SETTINGS_LOCALES = {
     "settings.particlesEnabled.description": "在人物背景上显示装饰粒子。",
     "settings.motionEnabled": "空闲时淡化",
     "settings.motionEnabled.description": "运行或拖动时突出人物，空闲时自动淡化。",
+    "settings.solidSurfaces": "不透明面板",
+    "settings.solidSurfaces.description": "输入框、气泡、菜单和卡片改为不透明表面，便于在人物/复杂背景上阅读；默认关闭以保留半透明质感。",
     "settings.failed": "保存失败，设置未更改。请重试。",
   },
   en: {
@@ -50,13 +52,15 @@ export const SETTINGS_LOCALES = {
     "settings.particlesEnabled.description": "Show decorative particles over the portrait background.",
     "settings.motionEnabled": "Fade while idle",
     "settings.motionEnabled.description": "Bring portraits forward while running or dragging, and fade them while idle.",
+    "settings.solidSurfaces": "Opaque panels",
+    "settings.solidSurfaces.description": "Use opaque input, bubble, menu and card surfaces for readability over the portrait; off keeps the translucent look.",
     "settings.failed": "Could not save. Settings have not changed. Please try again.",
   },
 };
 
 const GROUPS = [
   { title: "settings.group.slider", keys: ["bindEffort", "fineStopsEnabled", "hideSlider"] },
-  { title: "settings.group.visual", keys: ["maskEnabled", "xianxiaPortraits", "particlesEnabled", "motionEnabled"] },
+  { title: "settings.group.visual", keys: ["maskEnabled", "xianxiaPortraits", "particlesEnabled", "motionEnabled", "solidSurfaces"] },
 ] as const;
 
 export interface SettingsPanelProps {

@@ -400,18 +400,28 @@ async function assertNativeAppearance(page) {
   const result = await page.evaluate(() => ({
     buttons: [...document.querySelectorAll('.current_cubeRow > button')].map((button) => button.textContent),
     custom: document.querySelectorAll('.liang-appearance-choice').length,
+    enabled: document.body.hasAttribute('data-liang-skin'),
+    stage: document.body.dataset.liangStage ?? null,
     themeGets: window.__runtime.themeGets,
     themeSetCalls: window.__runtime.themeSetCalls,
     preference: window.__runtime.themePreference,
     expected: window.__runtime.expectedTheme,
     dark: document.body.hasAttribute('data-ds-dark-theme'),
+    colorScheme: document.documentElement.style.colorScheme,
   }));
   assert.deepEqual(result.buttons, ['浅色', '深色', '跟随系统'], 'General appearance keeps exactly the three native choices');
   assert.equal(result.custom, 0, 'The skin never injects a fourth appearance choice');
-  assert.equal(result.themeGets, 0, 'The presenter does not retrieve the host theme service');
+  assert.equal(result.themeGets, 0, 'The presenter never retrieves the host theme service');
   assert.deepEqual(result.themeSetCalls, [], 'Activation, frame changes, and shutdown never write the host theme');
   assert.equal(result.preference, result.expected, 'The user’s native light/dark/system preference is preserved');
-  assert.equal(result.dark, result.expected === 'dark', 'The skin does not override the host’s effective theme marker');
+  if (result.enabled) {
+    const dark = result.stage === '5';
+    assert.equal(result.dark, dark, 'The enabled skin mirrors its stage onto the host effective theme marker');
+    assert.equal(result.colorScheme, dark ? 'dark' : 'light', 'The enabled skin mirrors color-scheme for native controls');
+  } else {
+    assert.equal(result.dark, result.expected === 'dark', 'Disabling the skin restores the host effective theme marker');
+    assert.equal(result.colorScheme, '', 'Disabling the skin restores the host inline color-scheme');
+  }
 }
 
 async function assertDisabledStartup(test) {

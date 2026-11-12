@@ -165,6 +165,10 @@ class SkinPresenter {
   private raf = 0;
   private disposed = false;
   private readonly placementObserver: MutationObserver;
+  private readonly hostThemeObserver: MutationObserver;
+  // The host's effective scheme is mirrored only while the skin is active; the
+  // user's native theme preference is never written (see README).
+  private hostScheme: { dark: boolean; colorScheme: string } | null = null;
   private unsubscribe: () => void;
 
   constructor(scope: PreferenceStore) {
@@ -178,10 +182,62 @@ class SkinPresenter {
       if (this.enabled) this.mountBackdrop();
     });
     this.placementObserver.observe(document.body, { childList: true, subtree: true });
+    // Host theme presenters re-apply the palette attribute on theme changes;
+    // keep the skin-owned marker authoritative while the skin is enabled.
+    this.hostThemeObserver = new MutationObserver(() => {
+      this.syncHostScheme();
+    });
+    this.hostThemeObserver.observe(document.body, {
+      attributes: true,
+      attributeFilter: ["data-ds-dark-theme"],
+    });
+    this.hostThemeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["style"],
+    });
     this.portraits = this.createPortraits(false);
 
     this.unsubscribe = scope.subscribe(() => this.syncSettings());
     this.syncSettings();
+  }
+
+  /**
+   * Capture the host-owned scheme once, before the skin starts mirroring its
+   * own stage, so disabling or unloading can hand the DOM back untouched.
+   */
+  private captureHostScheme() {
+    if (this.hostScheme !== null) return;
+    this.hostScheme = {
+      dark: document.body.hasAttribute("data-ds-dark-theme"),
+      colorScheme: document.documentElement.style.colorScheme,
+    };
+  }
+
+  /**
+   * Mirror the skin's effective light/dark stage onto the host scheme markers.
+   * The host uses `body[data-ds-dark-theme]` to select its static palettes and
+   * `html { color-scheme }` for native controls, scrollbars and UA chrome; both
+   * must follow the skin palette or half the host surfaces keep the other
+   * theme's values (issues #24/#26). The user's saved theme preference is left
+   * alone because only the rendered markers are touched.
+   */
+  private syncHostScheme() {
+    if (this.disposed || !this.enabled) return;
+    const stage = document.body.dataset.liangStage;
+    if (stage === undefined) return;
+    this.captureHostScheme();
+    const dark = stage === "5";
+    document.body.toggleAttribute("data-ds-dark-theme", dark);
+    document.documentElement.style.colorScheme = dark ? "dark" : "light";
+  }
+
+  private restoreHostScheme() {
+    const saved = this.hostScheme;
+    if (saved === null) return;
+    this.hostScheme = null;
+    document.body.toggleAttribute("data-ds-dark-theme", saved.dark);
+    if (saved.colorScheme === "") document.documentElement.style.removeProperty("color-scheme");
+    else document.documentElement.style.colorScheme = saved.colorScheme;
   }
 
   private mountBackdrop() {
@@ -233,6 +289,9 @@ class SkinPresenter {
     this.setMaskEnabled(settings.maskEnabled);
     this.setEnabled(settings.enabled);
     this.syncOptionalEffects();
+    // The opaque-panels choice is a palette input, not a CSS class: repaint the
+    // current frame so the switch takes effect immediately.
+    if (this.enabled) this.applyFrame();
   }
 
   private syncOptionalEffects() {
@@ -312,6 +371,7 @@ class SkinPresenter {
       delete document.body.dataset.liangSkin;
       delete document.body.dataset.liangStage;
       for (const name of cssVariables) document.body.style.removeProperty(name);
+      this.restoreHostScheme();
     }
     this.syncOptionalEffects();
   }
@@ -336,7 +396,8 @@ class SkinPresenter {
 
   private applyFrame() {
     if (this.disposed || !this.enabled) return;
-    const palette = paletteForFrame(this.frame);
+    const settings = this.scope.getSnapshot();
+    const palette = paletteForFrame(this.frame, { solidSurfaces: settings.solidSurfaces });
     const body = document.body;
     body.dataset.liangStage = String(palette.stage);
     body.style.setProperty("--liang-strength", String(palette.strength));
@@ -360,6 +421,7 @@ class SkinPresenter {
     body.style.setProperty("--liang-accent-hover", palette.accentHover);
     body.style.setProperty("--liang-hover", palette.hover);
     body.style.setProperty("--liang-portrait-opacity", palette.portraitOpacity);
+    this.syncHostScheme();
     this.updatePortrait(palette.level);
     this.ambient?.setLevel(palette.level, palette.stage === 5);
     this.syncParticleAnchors();
@@ -384,6 +446,7 @@ class SkinPresenter {
     this.disposed = true;
     this.unsubscribe();
     this.placementObserver.disconnect();
+    this.hostThemeObserver.disconnect();
     if (this.raf !== 0) cancelAnimationFrame(this.raf);
     this.portraits.dispose();
     this.motion?.dispose();
@@ -396,6 +459,7 @@ class SkinPresenter {
     document.body.removeAttribute("data-liang-skin");
     delete document.body.dataset.liangStage;
     for (const name of cssVariables) document.body.style.removeProperty(name);
+    this.restoreHostScheme();
   }
 }
 

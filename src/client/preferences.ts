@@ -7,9 +7,10 @@ export interface SkinSettings {
   motionEnabled: boolean;
   fineStopsEnabled: boolean;
   hideSlider: boolean;
+  solidSurfaces: boolean;
 }
 
-export type OptionalSetting = "xianxiaPortraits" | "particlesEnabled" | "motionEnabled" | "fineStopsEnabled" | "hideSlider";
+export type OptionalSetting = "xianxiaPortraits" | "particlesEnabled" | "motionEnabled" | "fineStopsEnabled" | "hideSlider" | "solidSurfaces";
 export type PersistentSettings = Omit<SkinSettings, "enabled">;
 
 export interface PreferenceStore {
@@ -40,10 +41,13 @@ export const DEFAULT_SKIN_SETTINGS: Readonly<SkinSettings> = Object.freeze({
   motionEnabled: false,
   fineStopsEnabled: false,
   hideSlider: false,
+  // Translucency is the default look; this opt-in switch makes the input,
+  // menus and cards opaque for maximum readability over the portrait.
+  solidSurfaces: false,
 });
 
 const PERSISTENT_KEYS = [
-  "bindEffort", "maskEnabled", "xianxiaPortraits", "particlesEnabled", "motionEnabled", "fineStopsEnabled", "hideSlider",
+  "bindEffort", "maskEnabled", "xianxiaPortraits", "particlesEnabled", "motionEnabled", "fineStopsEnabled", "hideSlider", "solidSurfaces",
 ] as const;
 
 export function persistentSettings(settings: SkinSettings): PersistentSettings {

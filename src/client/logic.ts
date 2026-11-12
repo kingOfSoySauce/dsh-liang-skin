@@ -154,7 +154,12 @@ function rgb(value: Rgb, alpha = 1): string {
     : `rgba(${value[0]}, ${value[1]}, ${value[2]}, ${alpha})`;
 }
 
-export function paletteForFrame(rawFrame: number): Palette {
+export interface PaletteOptions {
+  /** Opt-in "opaque panels" mode: surfaces drop their translucency. */
+  solidSurfaces?: boolean;
+}
+
+export function paletteForFrame(rawFrame: number, options: PaletteOptions = {}): Palette {
   const frame = clampFrame(rawFrame);
   const level = (frame / PREVIEW_MAX_FRAME) * MAX_LEVEL;
   const portraitStage = Math.min(5, Math.floor(level / 6));
@@ -186,7 +191,9 @@ export function paletteForFrame(rawFrame: number): Palette {
     strength: level / MAX_LEVEL,
     page: rgb(page),
     // Keep the shell readable while allowing the right-side portrait to remain
-    // visibly present. Dense controls use deliberately translucent layers.
+    // visibly present. Translucency is part of the skin's look; readability is
+    // handled by theme-synced host surfaces, backdrop blur and the composer seat
+    // fade rather than by making the surfaces opaque.
     base: rgb(page, dark ? 0.42 : 0.28),
     maskBase: rgb(page, dark ? 0.42 : 0.28),
     maskStrong: rgb(page, 0.46),
@@ -194,10 +201,10 @@ export function paletteForFrame(rawFrame: number): Palette {
     controlRail: rgb(secondary, 0.28),
     controlBorder: rgb(secondary, 0.72),
     controlFill: rgb(mix(surface, secondary, 0.22)),
-    layer1: rgb(surface, 0.58),
-    layer2: rgb(surface2, 0.6),
-    layer3: rgb(surface2, 0.7),
-    sidebar: rgb(sidebar, 0.66),
+    layer1: rgb(surface, options.solidSurfaces === true ? 1 : 0.58),
+    layer2: rgb(surface2, options.solidSurfaces === true ? 1 : 0.6),
+    layer3: rgb(surface2, options.solidSurfaces === true ? 1 : 0.7),
+    sidebar: rgb(sidebar, options.solidSurfaces === true ? 1 : 0.66),
     ink: rgb(ink),
     secondary: rgb(secondary),
     tertiary: rgb(mix(secondary, page, 0.28)),

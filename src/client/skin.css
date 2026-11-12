@@ -95,6 +95,13 @@ body[data-liang-skin="on"] {
   --dsw-specific-input-major: var(--liang-layer-1) !important;
   --dsw-specific-menu: var(--liang-layer-3) !important;
   --dsw-specific-selector: var(--liang-layer-2) !important;
+  /* MenuSurface reads --dsw-menu-surface-fill directly; map it to the same
+     translucent Liang layer as the skin menus instead of the host's cool
+     light/dark literal so popovers keep the skin look (#23). */
+  --dsw-menu-surface-fill: var(--liang-layer-3) !important;
+  --dsw-alias-menu-icon: var(--liang-secondary) !important;
+  --dsw-alias-menu-group-header-fill: var(--liang-layer-3) !important;
+  --dsw-alias-bg-document-preview: var(--liang-layer-1) !important;
   --dsw-alias-markdown-citation: var(--liang-layer-2) !important;
   --dsw-alias-markdown-code-block-banner: var(--liang-layer-1) !important;
   --dsw-alias-markdown-code-block: var(--liang-layer-1) !important;
@@ -129,6 +136,12 @@ body[data-liang-skin="on"]:is(
   --dsw-specific-input-major: rgb(255, 255, 255) !important;
   --dsw-specific-menu: rgb(255, 255, 255) !important;
   --dsw-specific-selector: rgb(245, 246, 247) !important;
+  /* The settings selector pills/stepper/theme cubes read this host alias; the
+     host dark branch resolves it to #353638, which used to leak into the warm
+     light panel when the host native theme was dark (#26). Keep it on a
+     translucent Liang layer so the pills still belong to the skin. */
+  --dsw-alias-bg-module-platform: var(--liang-layer-2) !important;
+  --dsw-alias-bg-multi-select: var(--liang-layer-2) !important;
 }
 
 body[data-liang-skin="on"][data-liang-stage="5"] {
@@ -138,7 +151,9 @@ body[data-liang-skin="on"][data-liang-stage="5"] {
   --dsw-alias-button-info-fill: #c19a49 !important;
   --dsw-alias-button-info-hover: #d5b56e !important;
   --dsw-alias-state-business-primary: #c19a49 !important;
+  --dsw-alias-label-primary-inverted: #171816 !important;
   --dsw-alias-bg-module-platform: var(--liang-layer-3) !important;
+  --dsw-alias-bg-multi-select: var(--liang-layer-3) !important;
   --dsw-specific-sidebar-nav-item-active: var(--liang-layer-3) !important;
   --dsw-specific-sidebar-nav-item-hover: var(--liang-hover) !important;
 }
@@ -156,13 +171,16 @@ body[data-liang-skin="on"][data-liang-stage="5"] [class*="_turnStatusClock"] {
   -webkit-text-fill-color: #c19a49 !important;
 }
 
-/* Preserve the wordmark badge contrast in the low-intensity shell. */
+/* Preserve the wordmark badge contrast in the low-intensity shell. The sidebar
+   brand renders BrandWordmark with includeMark:false (viewBox "26 0 156 24"),
+   has no button[aria-label="新建会话"] ancestor on macOS, and its aria-label is
+   localized, so target the badge geometry itself (#23/#24). */
 body[data-liang-skin="on"]:is(
   [data-liang-stage="0"],
   [data-liang-stage="1"],
   [data-liang-stage="2"],
   [data-liang-stage="3"]
-) button[aria-label="新建会话"] svg[viewBox="0 0 182 24"] > rect[width="52"] {
+) svg:has(> g[clip-path*="badge"]) > rect[width="52"] {
   fill: rgb(15, 17, 21) !important;
 }
 
@@ -171,15 +189,15 @@ body[data-liang-skin="on"]:is(
   [data-liang-stage="1"],
   [data-liang-stage="2"],
   [data-liang-stage="3"]
-) button[aria-label="新建会话"] svg[viewBox="0 0 182 24"] > g[clip-path*="badge"] path {
+) svg > g[clip-path*="badge"] path {
   fill: rgb(249, 250, 251) !important;
 }
 
-body[data-liang-skin="on"][data-liang-stage="5"] button[aria-label="新建会话"] svg[viewBox="0 0 182 24"] > rect[width="52"] {
+body[data-liang-skin="on"][data-liang-stage="5"] svg:has(> g[clip-path*="badge"]) > rect[width="52"] {
   fill: #c19a49 !important;
 }
 
-body[data-liang-skin="on"][data-liang-stage="5"] button[aria-label="新建会话"] svg[viewBox="0 0 182 24"] > g[clip-path*="badge"] path {
+body[data-liang-skin="on"][data-liang-stage="5"] svg > g[clip-path*="badge"] path {
   fill: #171816 !important;
 }
 
@@ -293,37 +311,32 @@ body[data-liang-skin="on"] textarea {
 }
 
 /* The composer card has a native theme-mode fill, so keep its surface and
-   readable ink aligned with the active Liang palette. */
-body[data-liang-skin="on"]:is(
-  [data-liang-stage="0"],
-  [data-liang-stage="1"],
-  [data-liang-stage="2"],
-  [data-liang-stage="3"]
-) [data-composer-card="true"] {
+   readable ink aligned with the active Liang palette. The rules are
+   stage-agnostic: stage 5 used to fall back to the translucent layer token,
+   which let transcript text read through the input (#24). The card stays
+   translucent to match the rest of the skin, exactly like the low stages. */
+body[data-liang-skin="on"] [data-composer-card="true"] {
   border-color: var(--liang-border) !important;
   color: var(--liang-ink) !important;
   background: var(--liang-layer-1) !important;
   box-shadow: 0 8px 28px rgba(20, 22, 20, 0.08);
 }
 
-body[data-liang-skin="on"]:is(
-  [data-liang-stage="0"],
-  [data-liang-stage="1"],
-  [data-liang-stage="2"],
-  [data-liang-stage="3"]
-) [data-composer-card="true"] :is(textarea, button, [data-input-mirror="true"]) {
+body[data-liang-skin="on"] [data-composer-card="true"] :is(textarea, button, [data-input-mirror="true"]) {
   color: var(--liang-ink) !important;
   caret-color: var(--liang-accent) !important;
 }
 
-body[data-liang-skin="on"]:is(
-  [data-liang-stage="0"],
-  [data-liang-stage="1"],
-  [data-liang-stage="2"],
-  [data-liang-stage="3"]
-) [data-composer-card="true"] textarea::placeholder {
+body[data-liang-skin="on"] [data-composer-card="true"] textarea::placeholder {
   color: var(--liang-tertiary) !important;
   opacity: 1;
+}
+
+/* Full-page plugin panels mount inside the layout main panel and paint no page
+   background of their own; give them the opaque Liang page colour so plugin
+   pages stay readable instead of dissolving into the portrait (#23). */
+body[data-liang-skin="on"] #root [data-global-panel] {
+  background: var(--liang-page) !important;
 }
 
 .liang-effort-control {

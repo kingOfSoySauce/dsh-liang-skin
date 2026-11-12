@@ -49,7 +49,8 @@ describe("independent skin preferences", () => {
     const record = JSON.parse(env.items.get(PREFERENCE_STORAGE_KEY)!);
     expect(record.version).toBe(1);
     expect(record.values).toEqual({ bindEffort: false, maskEnabled: false, xianxiaPortraits: true,
-      particlesEnabled: true, motionEnabled: false, fineStopsEnabled: false, hideSlider: false });
+      particlesEnabled: true, motionEnabled: false, fineStopsEnabled: false, hideSlider: false,
+      solidSurfaces: false });
     expect(record.values).not.toHaveProperty("enabled");
     expect(env.items.get(LEGACY_BIND)).toBe("0");
     store.dispose();
@@ -62,6 +63,7 @@ describe("independent skin preferences", () => {
     const previous = {
       bindEffort: false, maskEnabled: true, xianxiaPortraits: true,
       particlesEnabled: false, motionEnabled: true, fineStopsEnabled: true,
+      solidSurfaces: false,
     };
     const env = browser({ [PREFERENCE_STORAGE_KEY]: JSON.stringify({ version: 1, values: previous }) });
     const store = createPreferenceStore();
@@ -146,7 +148,7 @@ describe("independent skin preferences", () => {
       particlesEnabled: true, motionEnabled: false, fineStopsEnabled: true,
     } });
     env.event(PREFERENCE_STORAGE_KEY, record);
-    expect(store.getSnapshot()).toEqual({ enabled: false, ...JSON.parse(record).values, hideSlider: false });
+    expect(store.getSnapshot()).toEqual({ enabled: false, ...JSON.parse(record).values, hideSlider: false, solidSurfaces: false });
     const count = changed.mock.calls.length;
     env.event(PREFERENCE_STORAGE_KEY, record);
     env.event(LEGACY_BIND, "0");
@@ -190,7 +192,8 @@ describe("independent skin preferences", () => {
 
   it("persists the master switch without rewriting any of the seven option values", async () => {
     const previous = { bindEffort: false, maskEnabled: false, xianxiaPortraits: true,
-      particlesEnabled: true, motionEnabled: true, fineStopsEnabled: true, hideSlider: true };
+      particlesEnabled: true, motionEnabled: true, fineStopsEnabled: true, hideSlider: true,
+      solidSurfaces: false };
     const record = JSON.stringify({ version: 1, values: previous });
     const env = browser({ [PREFERENCE_STORAGE_KEY]: record });
     const store = createPreferenceStore();

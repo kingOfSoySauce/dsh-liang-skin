@@ -61,6 +61,17 @@ describe("滑动变祖 effort mapping", () => {
     });
   });
 
+  it("can switch the functional surfaces to opaque for the readability option", () => {
+    const solidLight = paletteForFrame(0, { solidSurfaces: true });
+    expect(solidLight.layer1).toBe("rgb(248, 248, 245)");
+    expect(solidLight.layer2).toBe("rgb(238, 239, 235)");
+    expect(solidLight.layer3).toBe("rgb(238, 239, 235)");
+    expect(solidLight.sidebar).toBe("rgb(234, 235, 231)");
+    const solidDark = paletteForFrame(240, { solidSurfaces: true });
+    expect(solidDark.layer1).toBe("rgb(30, 27, 25)");
+    expect(paletteForFrame(0).layer1).toBe("rgba(248, 248, 245, 0.58)");
+  });
+
   it("finds the nearest available portrait keys", () => {
     const anchors = [0, 6, 12, 15, 18, 24, 27, 30];
     expect(portraitBlendForLevel(0, anchors)).toEqual({ lowerIndex: 0, upperIndex: 0, mix: 0 });

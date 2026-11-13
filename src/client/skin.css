@@ -158,9 +158,10 @@ body[data-liang-skin="on"][data-liang-stage="5"] {
   --dsw-specific-sidebar-nav-item-hover: var(--liang-hover) !important;
 }
 
-/* The host renders the running-turn label as a clipped blue text gradient.
-   Retarget only that gradient's color tokens in the custom dark skin; keep
-   the host's text clipping and shimmer behavior, and leave light mode alone. */
+/* The host renders the running-turn label ("深度求索中，用时 …") in blue.
+   Older hosts clip a blue text gradient from the static-deepseek tokens; newer
+   hosts moved it to the deep-diving tokens. Retarget both in the custom dark
+   skin only, leaving light mode native. */
 body[data-liang-skin="on"][data-liang-stage="5"] [class*="_turnStatus"] {
   --dsw-static-deepseek-500: #c19a49 !important;
   --dsw-static-deepseek-200: #d5b56e !important;
@@ -169,6 +170,11 @@ body[data-liang-skin="on"][data-liang-stage="5"] [class*="_turnStatus"] {
 body[data-liang-skin="on"][data-liang-stage="5"] [class*="_turnStatusClock"] {
   color: #c19a49 !important;
   -webkit-text-fill-color: #c19a49 !important;
+}
+
+body[data-liang-skin="on"][data-liang-stage="5"] [data-chat-running] {
+  --dsw-alias-label-deep-diving: #c19a49 !important;
+  --dsw-alias-label-deep-diving-shimmer: #d5b56e !important;
 }
 
 /* Preserve the wordmark badge contrast in the low-intensity shell. The sidebar

@@ -106,6 +106,26 @@ export function selectedEffortIndex(
   return id === undefined ? -1 : efforts.findIndex((effort) => effort.id === id);
 }
 
+/** Synthetic final slider stop that saves the maximum effort and enables Agent Teams. */
+export const TEAM_NODE_ID = "__liang-team__";
+
+/** Effort stops plus the optional synthetic Team stop at the very end. */
+export function sliderNodes(efforts: readonly EffortLike[], teamLabel: string | null): readonly EffortLike[] {
+  if (teamLabel === null || efforts.length < 2) return efforts;
+  return [...efforts, { id: TEAM_NODE_ID, name: teamLabel }];
+}
+
+/** Whether the last slider stop is the synthetic Team stop. */
+export function hasTeamNode(nodes: readonly EffortLike[]): boolean {
+  return nodes.length > 0 && nodes[nodes.length - 1].id === TEAM_NODE_ID;
+}
+
+/** Slider stop for the saved selection: the Team stop only while Team mode is on at max effort. */
+export function committedSliderIndex(committedIndex: number, count: number, teamActive: boolean): number {
+  if (!teamActive || committedIndex !== count - 2) return committedIndex;
+  return count - 1;
+}
+
 export function portraitBlendForLevel(level: number, anchors: readonly number[]) {
   if (anchors.length === 0) return { lowerIndex: -1, upperIndex: -1, mix: 0 };
   const safeLevel = Number.isFinite(level)

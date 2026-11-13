@@ -27,13 +27,17 @@ import { createPortraitLoader } from "./portrait-loader";
 import {
   PREVIEW_MAX_FRAME,
   MAX_LEVEL,
+  TEAM_NODE_ID,
   frameForLevel,
   snapFrame,
   frameForEffort,
+  committedSliderIndex,
+  hasTeamNode,
   indicatorLabel,
   nearestEffortIndex,
   paletteForFrame,
   selectedEffortIndex,
+  sliderNodes,
   type EffortLike,
 } from "./logic";
 
@@ -41,6 +45,10 @@ const PACKAGE_ID = "dsh-client-liang-intensity-skin";
 const LOCALE_NAMESPACE = "liang.skin";
 const ASSET_PREFIX = `/plugins/${PACKAGE_ID}/assets`;
 const BUNDLE_PACKAGE_ID = "@leon___/dsh-client-liang-intensity-skin";
+const TEAM_LOCALES = {
+  zh: { "slider.team": "智能体团队" },
+  en: { "slider.team": "agent teamwork" },
+} as const;
 const CONVERSATION_COLUMN_SELECTORS = [
   "[data-pane=\"conversation\"]",
   "[class*=\"centerCol\"]",
@@ -108,14 +116,26 @@ interface ModelDirectory {
   select(selection: ModelSelection): Promise<{ ok: boolean }>;
 }
 
+interface AgentTeamsRemote {
+  setEnabled(agentId: string, enabled: boolean): Promise<{ ok: boolean }>;
+}
+
+interface AgentTeamProjection {
+  enabled?: boolean;
+}
+
 interface SliderProps {
   directory: SnapshotStore<ModelDirectoryState>;
   load: () => void;
   select: (selection: ModelSelection) => Promise<boolean>;
+  setTeamEnabled: (enabled: boolean) => Promise<boolean>;
+  teamSupported: () => boolean;
+  t: (key: string) => string;
   presenter: SkinPresenter;
   scope: PreferenceStore;
   available: boolean;
   session?: SessionLike;
+  useProjection?: (key: string) => unknown;
 }
 
 interface SessionLike {
@@ -483,7 +503,19 @@ function useSessionRunning(session: SessionLike | undefined) {
   );
 }
 
-function LiangEffortSlider({ directory, load, select, presenter, scope, available, session }: SliderProps) {
+function LiangEffortSlider({
+  directory,
+  load,
+  select,
+  setTeamEnabled,
+  teamSupported,
+  t,
+  presenter,
+  scope,
+  available,
+  session,
+  useProjection,
+}: SliderProps) {
   const state = useSyncExternalStore(
     (listener) => directory.subscribe(listener),
     () => directory.getSnapshot(),
@@ -492,25 +524,40 @@ function LiangEffortSlider({ directory, load, select, presenter, scope, availabl
     (listener) => scope.subscribe(listener),
     () => scope.getSnapshot(),
   );
+  const runtimeTeam = useProjection?.("agentTeam") as AgentTeamProjection | undefined;
   const reasoning = useMemo(() => modelReasoning(state), [state]);
   const efforts = reasoning?.efforts ?? [];
+  const bindEffort = skin.bindEffort;
+  const teamEnabled = runtimeTeam?.enabled === true;
+  // The extra stop exists only while this client can save Team mode and the
+  // session publishes its saved Team selection; otherwise the slider is
+  // exactly the effort ladder it has always been.
+  const teamStop = bindEffort && skin.teamNode
+    && teamSupported()
+    && runtimeTeam !== undefined && typeof runtimeTeam.enabled === "boolean"
+    && efforts.length >= 2
+    ? `${efforts[efforts.length - 1].name} ${t("slider.team")}`
+    : null;
+  const nodes = sliderNodes(efforts, teamStop);
+  const teamNode = hasTeamNode(nodes);
   const committedIndex = selectedEffortIndex(
     efforts,
     reasoning?.selection.reasoningEffort,
     reasoning?.defaultEffort,
   );
+  const teamActive = teamNode && teamEnabled && committedIndex === efforts.length - 1;
+  const committedNodeIndex = committedSliderIndex(committedIndex, nodes.length, teamActive);
   // An unknown committed effort defaults to the max frame: a fresh
   // conversation paints the dark shell immediately instead of flashing the
   // light palette until the directory load resolves the real effort.
-  const effortFrame = committedIndex < 0
+  const effortFrame = committedNodeIndex < 0
     ? PREVIEW_MAX_FRAME
-    : frameForEffort(committedIndex, efforts.length);
-  const bindEffort = skin.bindEffort;
+    : frameForEffort(committedNodeIndex, nodes.length);
   const fine = bindEffort && skin.fineStopsEnabled;
   const committedFrame = fine ? snapFrame(effortFrame) : effortFrame;
   const modelKey = JSON.stringify([reasoning?.selection.provider, reasoning?.selection.model, efforts.map((effort) => effort.id)]);
-  const selectionKey = JSON.stringify([modelKey, efforts[committedIndex]?.id ?? null]);
-  const modeKey = JSON.stringify([modelKey, bindEffort, fine]);
+  const selectionKey = JSON.stringify([modelKey, teamActive ? TEAM_NODE_ID : efforts[committedIndex]?.id ?? null]);
+  const modeKey = JSON.stringify([modelKey, bindEffort, fine, teamNode]);
   const sync = useRef(createEffortSync());
   const latest = useRef({ modelKey, committedFrame });
   latest.current = { modelKey, committedFrame };
@@ -571,12 +618,10 @@ function LiangEffortSlider({ directory, load, select, presenter, scope, availabl
   if (!enabled || skin.hideSlider) return null;
   if (bindEffort && (reasoning === null || efforts.length < 2)) return null;
 
-  const previewIndex = nearestEffortIndex(frame, efforts);
-  const previewEffort = efforts[previewIndex];
+  const previewIndex = nearestEffortIndex(frame, nodes);
+  const previewNode = nodes[previewIndex];
   const progressRatio = frame / PREVIEW_MAX_FRAME;
-  const tooltipLabel = indicatorLabel(frame, bindEffort ? efforts : [], { withLevel: fine });
-
-
+  const tooltipLabel = indicatorLabel(frame, bindEffort ? nodes : [], { withLevel: fine });
 
   const commit = async (rawFrame: number) => {
     if (!bindEffort) {
@@ -586,22 +631,36 @@ function LiangEffortSlider({ directory, load, select, presenter, scope, availabl
       return;
     }
     const fineFrame = fine ? snapFrame(rawFrame) : rawFrame;
-    const targetIndex = nearestEffortIndex(fineFrame, efforts);
-    const target = efforts[targetIndex];
+    const targetIndex = nearestEffortIndex(fineFrame, nodes);
+    const target = nodes[targetIndex];
     if (target === undefined) return;
-    const targetFrame = fine ? fineFrame : frameForEffort(targetIndex, efforts.length);
+    const targetIsTeam = teamNode && targetIndex === nodes.length - 1;
+    const targetEffortIndex = targetIsTeam ? efforts.length - 1 : targetIndex;
+    const targetEffort = efforts[targetEffortIndex];
+    if (targetEffort === undefined) return;
+    const targetFrame = targetIsTeam
+      ? PREVIEW_MAX_FRAME
+      : fine ? fineFrame : frameForEffort(targetEffortIndex, nodes.length);
     dragging.current = false;
     setFrame(targetFrame);
     presenter.setFrame(targetFrame);
-    if (targetIndex === committedIndex || pending) return;
-    if (fine) sync.current.submit(JSON.stringify([modelKey, target.id]), selectionKey, modeKey);
+    const effortChanged = targetEffortIndex !== committedIndex;
+    // The Team switch follows the slider: ending on the Team stop turns it on,
+    // ending anywhere below turns it off (only while the stop exists).
+    const teamChanged = teamNode && targetIsTeam !== teamEnabled;
+    if ((!effortChanged && !teamChanged) || pending) return;
+    if (fine) sync.current.submit(JSON.stringify([modelKey, targetIsTeam ? TEAM_NODE_ID : targetEffort.id]), selectionKey, modeKey);
     setPending(true);
     setFailed(false);
-    const accepted = await select({
-      provider: reasoning.selection.provider,
-      model: reasoning.selection.model,
-      reasoningEffort: target.id,
-    });
+    let accepted = true;
+    if (effortChanged) {
+      accepted = await select({
+        provider: reasoning.selection.provider,
+        model: reasoning.selection.model,
+        reasoningEffort: targetEffort.id,
+      });
+    }
+    if (accepted && teamChanged) accepted = await setTeamEnabled(targetIsTeam);
     setPending(false);
     if (!accepted) {
       sync.current.reset();
@@ -616,7 +675,7 @@ function LiangEffortSlider({ directory, load, select, presenter, scope, availabl
       className="liang-effort-control"
       data-plugin={PACKAGE_ID}
       data-state={failed ? "error" : pending ? "pending" : "ready"}
-      title={bindEffort ? previewEffort?.name : undefined}
+      title={bindEffort ? previewNode?.name : undefined}
     >
       {interacting && (
         <output
@@ -631,11 +690,11 @@ function LiangEffortSlider({ directory, load, select, presenter, scope, availabl
           <i className="liang-effort-control__tick liang-effort-control__tick--minor" key={`fine-${level}`}
             style={{ left: `${(frameForLevel(level) / PREVIEW_MAX_FRAME) * 100}%` }} />
         ))}
-        {efforts.map((effort, index) => (
+        {nodes.map((node, index) => (
           <i
             className="liang-effort-control__tick"
-            key={effort.id}
-            style={{ left: `${(frameForEffort(index, efforts.length) / PREVIEW_MAX_FRAME) * 100}%` }}
+            key={node.id}
+            style={{ left: `${(frameForEffort(index, nodes.length) / PREVIEW_MAX_FRAME) * 100}%` }}
           />
         ))}
       </div>
@@ -648,7 +707,7 @@ function LiangEffortSlider({ directory, load, select, presenter, scope, availabl
         value={frame}
         disabled={pending || state.status === "selecting"}
         aria-label={bindEffort ? "思考等级" : "皮肤进度"}
-        aria-valuetext={bindEffort ? previewEffort?.name ?? "" : tooltipLabel}
+        aria-valuetext={bindEffort ? previewNode?.name ?? "" : tooltipLabel}
         onPointerDown={() => {
           dragging.current = true;
           dragStartFrame.current = frame;
@@ -733,11 +792,21 @@ export function apply(ctx: ClientContext) {
   ctx.effect(() => () => presenter.dispose(), "liang-intensity-skin: backdrop presenter");
   ctx.effect(
     () => ctx.locale.register(LOCALE_NAMESPACE, {
-      zh: { ...SETTINGS_LOCALES.zh, ...UPDATE_LOCALES.zh },
-      en: { ...SETTINGS_LOCALES.en, ...UPDATE_LOCALES.en },
+      zh: { ...SETTINGS_LOCALES.zh, ...UPDATE_LOCALES.zh, ...TEAM_LOCALES.zh },
+      en: { ...SETTINGS_LOCALES.en, ...UPDATE_LOCALES.en, ...TEAM_LOCALES.en },
     }),
     "liang-intensity-skin: settings locale",
   );
+
+  // Agent Teams is the client's own optional capability: resolve it lazily so
+  // a client without the Remote namespace keeps the original slider. `get`
+  // reads the service store without declaring an inject requirement.
+  const resolveAgentTeams = () => {
+    try {
+      return (ctx.get as (name: string) => unknown)("remote.agentTeams") as AgentTeamsRemote | undefined;
+    } catch { return undefined; }
+  };
+  const teamSupported = () => typeof resolveAgentTeams()?.setEnabled === "function";
 
   // The official Plugins page owns this slot. inject waits for it without
   // making plugin-page services mandatory for the skin on older hosts.
@@ -745,7 +814,7 @@ export function apply(ctx: ClientContext) {
     name: "plugins.bundle.config",
     key: BUNDLE_PACKAGE_ID,
     locale: LOCALE_NAMESPACE,
-    inject: () => ({ scope, updater }),
+    inject: () => ({ scope, updater, teamAvailable: teamSupported }),
   }, SettingsPanel));
 
   const settingsTitle = ctx.locale.bind(LOCALE_NAMESPACE);
@@ -755,7 +824,7 @@ export function apply(ctx: ClientContext) {
     order: 46,
     label: () => settingsTitle("settings.title"),
     locale: LOCALE_NAMESPACE,
-    inject: () => ({ scope, updater }),
+    inject: () => ({ scope, updater, teamAvailable: teamSupported }),
   }, LiangSettingsPage));
 
   ctx.slots.inject("conversation.input.right", () => ctx.slots.register({
@@ -777,6 +846,18 @@ export function apply(ctx: ClientContext) {
         directory: directory.store,
         presenter,
         scope,
+        teamSupported,
+        t: (key: string) => settingsTitle(key),
+        setTeamEnabled: async (enabled: boolean) => {
+          const agentTeams = resolveAgentTeams();
+          if (agentTeams === undefined) return false;
+          try {
+            const result = await agentTeams.setEnabled(sessionId, enabled);
+            return result?.ok === true;
+          } catch {
+            return false;
+          }
+        },
         load: () => {
           if (available) void directory.load().catch(() => undefined);
         },

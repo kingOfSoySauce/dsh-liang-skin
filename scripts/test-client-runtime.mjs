@@ -38,7 +38,7 @@ async function bounded(promise, message) {
   }
 }
 
-async function fixture({ fail = () => false, holdRetry = null, enabled = true, nativeTheme = 'system' } = {}) {
+async function fixture({ fail = () => false, holdRetry = null, enabled = true, nativeTheme = 'system', teamRemote = null } = {}) {
   const context = await browser.newContext({ viewport: { width: 1200, height: 900 } });
   const page = await context.newPage();
   const errors = [];
@@ -85,7 +85,7 @@ async function fixture({ fail = () => false, holdRetry = null, enabled = true, n
     }
   });
   await page.goto('http://liang.test/');
-  await page.evaluate(({ enabled, nativeTheme }) => {
+  await page.evaluate(({ enabled, nativeTheme, teamRemote }) => {
     if (!enabled) localStorage.setItem('dsh-liang-intensity-skin.enabled.v1', '0');
     const runtime = {
       cleanups: [], decoded: new WeakSet(), decodedImages: [],
@@ -93,6 +93,7 @@ async function fixture({ fail = () => false, holdRetry = null, enabled = true, n
       activeLocales: 0, activeSlots: 0, errors: [],
       registrations: new Map(), dictionaries: new Map(), settings: null,
       expectedTheme: nativeTheme, themePreference: nativeTheme, themeSetCalls: [], themeGets: 0,
+      teamRemote, teamRemoteCalls: [],
     };
     window.__runtime = runtime;
     document.body.toggleAttribute('data-ds-dark-theme', nativeTheme === 'dark');
@@ -125,7 +126,7 @@ async function fixture({ fail = () => false, holdRetry = null, enabled = true, n
         });
       },
     };
-  }, { enabled, nativeTheme });
+  }, { enabled, nativeTheme, teamRemote });
   await page.addScriptTag({ content: client });
   await page.evaluate(() => {
     const runtime = window.__runtime;
@@ -144,6 +145,15 @@ async function fixture({ fail = () => false, holdRetry = null, enabled = true, n
       },
       get(name) {
         if (name === 'theme') { runtime.themeGets++; return theme; }
+        if (name === 'remote.agentTeams' && runtime.teamRemote !== null) {
+          return {
+            setEnabled: async (sessionId, enabled) => {
+              runtime.teamRemoteCalls.push({ sessionId, enabled });
+              if (runtime.teamRemote === 'throw') throw new Error('fixture: team save rejected');
+              return { ok: runtime.teamRemote === 'ok' };
+            },
+          };
+        }
         if (name === 'remote') return undefined;
         throw new Error(`Unexpected host service: ${name}`);
       },
@@ -287,10 +297,19 @@ async function assertPluginSettings(page) {
     check(![...runtime.registrations.values()].some(({ definition }) => definition.name === 'settings.general.item'),
       'The old General binding and mask rows are removed');
     const dictionary = runtime.dictionaries.get(settings.definition.locale);
-    for (const key of ['enabled', 'bindEffort', 'maskEnabled', 'xianxiaPortraits', 'particlesEnabled', 'motionEnabled', 'fineStopsEnabled', 'hideSlider']) {
+    for (const key of ['enabled', 'bindEffort', 'maskEnabled', 'xianxiaPortraits', 'particlesEnabled', 'motionEnabled', 'fineStopsEnabled', 'hideSlider', 'teamNode']) {
       check(typeof dictionary?.zh?.[`settings.${key}`] === 'string'
         && typeof dictionary?.en?.[`settings.${key}`] === 'string', `Setting ${key} has both locales`);
     }
+    check(typeof dictionary?.zh?.['slider.team'] === 'string' && typeof dictionary?.en?.['slider.team'] === 'string',
+      'The Team stop name has both locales');
+    check(typeof settings.props.teamAvailable === 'function' && settings.props.teamAvailable() === false,
+      'A client without the Agent Teams Remote hides the Team setting');
+    check(typeof runtime.registered.teamSupported === 'function' && runtime.registered.teamSupported() === false,
+      'The conversation control hides the Team stop when the Remote is unavailable');
+    check(typeof runtime.registered.setTeamEnabled === 'function' && await runtime.registered.setTeamEnabled(true) === false,
+      'The Team stop fails safely without the Remote');
+    check(runtime.scope.getSnapshot().teamNode === true, 'The Team stop is enabled by default');
     const before = runtime.scope.getSnapshot();
     check(before.bindEffort && before.maskEnabled, 'Binding and mask retain their existing defaults');
     await runtime.scope.update({ bindEffort: false, maskEnabled: false });
@@ -318,6 +337,36 @@ async function assertPluginSettings(page) {
   });
   assert.equal(result.passed, true);
   assert.equal(result.slots, 3, 'Runtime registers the conversation control plus both settings entry points');
+}
+
+async function assertTeamCapability(page) {
+  const result = await page.evaluate(async () => {
+    const runtime = window.__runtime;
+    const check = (condition, message) => { if (!condition) throw new Error(message); };
+    check(runtime.teamRemote !== null, 'Fixture supplies the Agent Teams Remote');
+    check(typeof runtime.registered.teamSupported === 'function' && runtime.registered.teamSupported() === true,
+      'The conversation control detects the Agent Teams Remote');
+    check(typeof runtime.settings.props.teamAvailable === 'function' && runtime.settings.props.teamAvailable() === true,
+      'Settings offer the Team stop when the Remote is available');
+    check(runtime.scope.getSnapshot().teamNode === true, 'The Team stop is enabled by default');
+    const enabled = await runtime.registered.setTeamEnabled(true);
+    check(enabled === true, 'The Team stop saves Team mode through the Remote');
+    check(runtime.teamRemoteCalls.length === 1
+      && runtime.teamRemoteCalls[0].sessionId === 'fixture-session'
+      && runtime.teamRemoteCalls[0].enabled === true, 'The Team stop enables Team mode for its own Session');
+    const disabled = await runtime.registered.setTeamEnabled(false);
+    check(disabled === true, 'Leaving the Team stop saves Team mode off');
+    check(runtime.teamRemoteCalls.length === 2 && runtime.teamRemoteCalls[1].enabled === false,
+      'The same Session switch follows the slider both ways');
+    runtime.teamRemote = 'reject';
+    const rejected = await runtime.registered.setTeamEnabled(true);
+    check(rejected === false, 'A refused Team save reports failure without throwing');
+    runtime.teamRemote = 'throw';
+    const thrown = await runtime.registered.setTeamEnabled(true);
+    check(thrown === false, 'A throwing Team save reports failure without throwing');
+    return { calls: runtime.teamRemoteCalls.length };
+  });
+  assert.equal(result.calls, 4, 'Every Team request reaches the Remote');
 }
 
 async function assertOptionalEffects(test) {
@@ -525,6 +574,14 @@ try {
     await optional.close();
   }
 
+  const team = await fixture({ teamRemote: 'ok' });
+  try {
+    await assertTeamCapability(team.page);
+    await assertNoErrors(team);
+  } finally {
+    await team.close();
+  }
+
   const partial = await fixture({ fail: (name) => name === 'stage-12.webp' || name === 'level-01.webp' });
   try {
     await waitForPortrait(partial.page, 'stage-30.webp');
@@ -559,7 +616,7 @@ try {
   } finally {
     await recovery.close();
   }
-  console.log('PASS: built apply(ctx), native theme preservation, persisted master switch, 24 native WebP decodes, frame swaps, partial failure, first-frame retry, official plugin settings, opt-in portraits/particles/motion, disable/enable, and disposal with late responses.');
+  console.log('PASS: built apply(ctx), native theme preservation, persisted master switch, 24 native WebP decodes, frame swaps, partial failure, first-frame retry, official plugin settings, Agent Teams capability, opt-in portraits/particles/motion, disable/enable, and disposal with late responses.');
 } finally {
   await browser.close();
 }

@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  TEAM_NODE_ID,
+  committedSliderIndex,
   frameForEffort,
+  hasTeamNode,
   indicatorLabel,
   liangRankForFrame,
   nearestEffortIndex,
   paletteForFrame,
   portraitBlendForLevel,
   selectedEffortIndex,
+  sliderNodes,
 } from "./logic";
 
 const efforts = [
@@ -77,6 +81,27 @@ describe("滑动变祖 effort mapping", () => {
     expect(portraitBlendForLevel(0, anchors)).toEqual({ lowerIndex: 0, upperIndex: 0, mix: 0 });
     expect(portraitBlendForLevel(13.5, anchors)).toEqual({ lowerIndex: 2, upperIndex: 3, mix: 0.5 });
     expect(portraitBlendForLevel(31, anchors)).toEqual({ lowerIndex: 7, upperIndex: 7, mix: 0 });
+  });
+
+  it("appends the named Team stop after every real effort", () => {
+    const nodes = sliderNodes(efforts, "Max 团队");
+    expect(nodes).toEqual([...efforts, { id: TEAM_NODE_ID, name: "Max 团队" }]);
+    expect(hasTeamNode(nodes)).toBe(true);
+    expect(hasTeamNode(efforts)).toBe(false);
+    expect(sliderNodes(efforts, null)).toBe(efforts);
+    expect(sliderNodes([{ id: "max", name: "Max" }], "Max 团队")).toEqual([{ id: "max", name: "Max" }]);
+    expect([0, 1, 2, 3].map((index) => frameForEffort(index, nodes.length))).toEqual([0, 80, 160, 240]);
+    expect(nearestEffortIndex(240, nodes)).toBe(3);
+    expect(nearestEffortIndex(201, nodes)).toBe(3);
+    expect(nearestEffortIndex(199, nodes)).toBe(2);
+  });
+
+  it("sits on the Team stop only while Team mode is saved at max effort", () => {
+    const count = sliderNodes(efforts, "Max 团队").length;
+    expect(committedSliderIndex(2, count, true)).toBe(3);
+    expect(committedSliderIndex(2, count, false)).toBe(2);
+    expect(committedSliderIndex(1, count, true)).toBe(1);
+    expect(committedSliderIndex(-1, count, true)).toBe(-1);
   });
 
   it("labels continuous Liang ranks independently from model efforts", () => {

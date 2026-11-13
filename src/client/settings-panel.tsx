@@ -16,6 +16,8 @@ export const SETTINGS_LOCALES = {
     "settings.group.visual": "外观",
     "settings.bindEffort": "绑定思考等级",
     "settings.bindEffort.description": "拖动滑块时同步修改模型的推理档位。关闭后只改变外观。",
+    "settings.teamNode": "滑块绑定智能体团队",
+    "settings.teamNode.description": "滑块兼容智能体团队",
     "settings.fineStopsEnabled": "31 档细分",
     "settings.fineStopsEnabled.description": "外观可停在 0–30 的每一级；模型仍使用最近的真实推理档位。",
     "settings.hideSlider": "隐藏滑块",
@@ -40,6 +42,8 @@ export const SETTINGS_LOCALES = {
     "settings.group.visual": "Appearance",
     "settings.bindEffort": "Bind reasoning level",
     "settings.bindEffort.description": "Update the model’s reasoning effort with the slider. Turn off to change appearance only.",
+    "settings.teamNode": "Bind slider to agent teamwork",
+    "settings.teamNode.description": "The slider supports agent teamwork",
     "settings.fineStopsEnabled": "31 fine stops",
     "settings.fineStopsEnabled.description": "Stop at every visual level from 0–30. The model still uses the nearest actual effort.",
     "settings.hideSlider": "Hide slider",
@@ -59,19 +63,22 @@ export const SETTINGS_LOCALES = {
 };
 
 const GROUPS = [
-  { title: "settings.group.slider", keys: ["bindEffort", "fineStopsEnabled", "hideSlider"] },
+  { title: "settings.group.slider", keys: ["bindEffort", "teamNode", "fineStopsEnabled", "hideSlider"] },
   { title: "settings.group.visual", keys: ["maskEnabled", "xianxiaPortraits", "particlesEnabled", "motionEnabled", "solidSurfaces"] },
 ] as const;
 
 export interface SettingsPanelProps {
   scope: PreferenceStore;
   updater?: SkinUpdaterStore;
+  /** Whether this client can save Agent Teams mode; the Team stop is hidden otherwise. */
+  teamAvailable?: () => boolean;
   t: (key: string) => string;
 }
 
 /** Independent controls apply and persist immediately; no setting enables the others. */
-export function SettingsPanel({ scope, updater, t }: SettingsPanelProps) {
+export function SettingsPanel({ scope, updater, teamAvailable, t }: SettingsPanelProps) {
   const snapshot = useSyncExternalStore((listener) => scope.subscribe(listener), () => scope.getSnapshot());
+  const canUseTeamNode = teamAvailable === undefined || teamAvailable();
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
   const busy = useRef(false);
@@ -118,20 +125,26 @@ export function SettingsPanel({ scope, updater, t }: SettingsPanelProps) {
       {GROUPS.map((group) => (
         <section className="liang-settings-panel__group" key={group.title} aria-label={t(group.title)}>
           <h3 className="liang-settings-panel__heading">{t(group.title)}</h3>
-          {group.keys.map((key) => (
-            <div className="liang-settings-panel__row" key={key}>
-              <div className="liang-settings-panel__copy">
-                <div className="liang-settings-panel__label">{t(`settings.${key}`)}</div>
-                <p className="liang-settings-panel__description">{t(`settings.${key}.description`)}</p>
+          {group.keys.map((key) => {
+            if (key === "teamNode" && !canUseTeamNode) return null;
+            const descriptionKey = `settings.${key}.description`;
+            const description = t(descriptionKey);
+            return (
+              <div className="liang-settings-panel__row" key={key}>
+                <div className="liang-settings-panel__copy">
+                  <div className="liang-settings-panel__label">{t(`settings.${key}`)}</div>
+                  {description !== descriptionKey
+                    && <p className="liang-settings-panel__description">{description}</p>}
+                </div>
+                <Switch
+                  checked={snapshot[key]}
+                  disabled={pending}
+                  label={t(`settings.${key}`)}
+                  onChange={(value) => { void change(key, value); }}
+                />
               </div>
-              <Switch
-                checked={snapshot[key]}
-                disabled={pending}
-                label={t(`settings.${key}`)}
-                onChange={(value) => { void change(key, value); }}
-              />
-            </div>
-          ))}
+            );
+          })}
         </section>
       ))}
       {failed && <p className="liang-settings-panel__error" role="alert">{t("settings.failed")}</p>}

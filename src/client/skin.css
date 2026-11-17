@@ -345,6 +345,22 @@ body[data-liang-skin="on"] #root [data-global-panel] {
   background: var(--liang-page) !important;
 }
 
+/* Dialogs contributed by third-party plugins paint the host
+   --dsw-alias-bg-base token, which this skin sets to transparent so the stage
+   shows through the app canvas. ds-harness-remote's Remote dialog and its
+   inline sign-in service-address field are such surfaces, so repaint them from
+   the Liang layer: translucent with the default skin look and fully opaque
+   once the opaque-panels switch is on. The rules are split so a browser
+   without :has() support still keeps the dialog surface. */
+body[data-liang-skin="on"] .dshRemotePage {
+  --dsw-alias-bg-base: var(--liang-layer-1) !important;
+  background: var(--liang-layer-1) !important;
+}
+
+body[data-liang-skin="on"] .dshRemoteInlineSignIn > .dshRemoteServiceAddress:has(form) {
+  background: var(--liang-layer-1) !important;
+}
+
 .liang-effort-control {
   --liang-control-accent: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
   --liang-control-rail: var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.16));

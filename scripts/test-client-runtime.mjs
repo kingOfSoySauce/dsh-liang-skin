@@ -369,6 +369,53 @@ async function assertTeamCapability(page) {
   assert.equal(result.calls, 4, 'Every Team request reaches the Remote');
 }
 
+// Dialogs contributed by other plugins paint the host --dsw-alias-bg-base
+// token. The skin turns that token transparent, so their surfaces must follow
+// the Liang layer instead, including the opaque-panels switch.
+async function assertPluginDialogSurface(page) {
+  const result = await page.evaluate(async () => {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'dshRemoteBackdrop';
+    backdrop.innerHTML = `
+      <section class="dshRemotePage" role="dialog" aria-modal="true">
+        <div class="dshRemoteInlineSignIn">
+          <div class="dshRemoteServiceAddress"><form><input></form></div>
+        </div>
+      </section>`;
+    document.body.append(backdrop);
+    const page = backdrop.querySelector('.dshRemotePage');
+    const field = backdrop.querySelector('.dshRemoteServiceAddress');
+    const read = () => ({
+      page: getComputedStyle(page).backgroundColor,
+      token: getComputedStyle(page).getPropertyValue('--dsw-alias-bg-base').trim(),
+      field: getComputedStyle(field).backgroundColor,
+      layer1: getComputedStyle(document.body).getPropertyValue('--liang-layer-1').trim(),
+    });
+    // The palette is applied on the next animation frame after a settings change.
+    const settle = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const translucent = read();
+    await window.__runtime.scope.setOption('solidSurfaces', true);
+    await settle();
+    const opaque = read();
+    await window.__runtime.scope.setOption('solidSurfaces', false);
+    await settle();
+    const restored = read();
+    backdrop.remove();
+    return { translucent, opaque, restored };
+  });
+  // Serialized by the browser: `rgb(r, g, b)` is fully opaque, `rgba(r, g, b, a)` keeps its alpha.
+  const alpha = (color) => color.startsWith('rgba(') ? Number(color.match(/,\s*([\d.]+)\)$/)[1]) : 1;
+  for (const [mode, sample] of Object.entries(result)) {
+    assert.equal(sample.page, sample.layer1, `${mode}: the Remote dialog paints the Liang layer`);
+    assert.equal(sample.field, sample.layer1, `${mode}: the Remote service-address field paints the Liang layer`);
+    assert.equal(sample.token, sample.layer1, `${mode}: the Remote dialog background token resolves to the Liang layer`);
+    assert.notEqual(alpha(sample.page), 0, `${mode}: the Remote dialog stays visible`);
+  }
+  assert.ok(alpha(result.translucent.page) < 1, 'The Remote dialog keeps the translucent skin look by default');
+  assert.equal(alpha(result.opaque.page), 1, 'The opaque-panels switch makes the Remote dialog fully opaque');
+  assert.equal(alpha(result.restored.page), alpha(result.translucent.page), 'Turning the switch off restores the translucent dialog');
+}
+
 async function assertOptionalEffects(test) {
   const { page, requests } = test;
   await page.waitForFunction(() => window.__runtime.decodedImages.length === 24, null, { timeout: 15000 });
@@ -530,6 +577,7 @@ try {
     assert.equal(success.requests.length, 24, 'Decoded display nodes do not start duplicate requests');
     assert.equal(new Set(success.requests.map(({ name }) => name)).size, 24, 'Every shipped anchor is requested');
     await assertPluginSettings(success.page);
+    await assertPluginDialogSurface(success.page);
     await success.page.evaluate(() => window.__runtime.presenter.setFrame(48));
     await waitForPortrait(success.page, 'stage-06.webp');
     await success.page.evaluate(() => window.__runtime.presenter.choose(false));
